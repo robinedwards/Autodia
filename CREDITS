@@ -1,0 +1,24 @@
+CREDITS
+-------
+
+Developers:
+Aaron Trevena <ajt@droogs.org>   ( Author and maintainer )
+Simon Wistow <simon@thegestalt.org>
+Lars Clausen
+
+Contributors:
+Tony Payne, Ekkehard Goerlard, Felix Hallmann.
+
+Hosting the website:
+Alaric Snell.
+
+Hosting the mailing list and mirror:
+Leo Lapworth.
+
+Also thanks to:
+- The authors of Perl, the core modules and the Template Toolkit.
+- The Dia team for producing a useful piece of software.
+- The nice people on #perl and #london.pm irc channels.
+- Matt and Leo, for getting me into OO Perl and Template Toolkit.
+
+

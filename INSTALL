@@ -1,0 +1,39 @@
+INSTALL
+-------
+
+Vanilla Install
+
+If you are running autodia against perl, c++ or PHP source code then you can install using the usual perl
+technique :
+
+% perl Makefile.PL
+% make
+% make test
+% su
+# make install
+
+when you run perl Makefile.PL you may see a warning that requisites Inline and Inline::Java are not installed. This is fine if you do not need to run diatool or use Autodia with java.
+
+Java Install
+
+if You want to use autodia against java then you require some extra perl modules
+- Inline
+- Inline::Java
+
+You will also need to copy the file named autodia_java over the file name autodia
+
+so your installation would go :
+
+% perl -MPAN -e 'install Inline'
+% perl -MPAN -e 'install Inline::Java'
+% cp autodia_java autodia
+% perl Makefile.PL
+% make
+% make test
+% su
+# make install
+
+
+
+
+any problems email autodia@droogs.org
