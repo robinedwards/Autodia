@@ -57,142 +57,146 @@ print "complete. (processed ", scalar(@{$config{filenames}}), " files)\n\n" unle
 ####################################################################
 
 sub get_config {
-  my @ARGV = @{shift()};
-  my %args = %{shift()};
+    my @ARGV = @{shift()};
+    my %args = %{shift()};
 
-  if (defined $args{'V'}) {
-    print "\n\nAutoDia - version ".$Autodia::VERSION."(c) copyright 2003 A Trevena\n\n";
-    exit;
-  }
+    if (defined $args{'V'}) {
+	print "\n\nAutoDia - version ".$Autodia::VERSION."(c) copyright 2003 A Trevena\n\n";
+	exit;
+    }
 
 
-  $args{'i'} =~ s/\"// if defined $args{'i'};
-  $args{'d'} =~ s/\"// if defined $args{'d'};
+    $args{'i'} =~ s/\"// if defined $args{'i'};
+    $args{'d'} =~ s/\"// if defined $args{'d'};
 
-  if ($args{'h'}) {
-    print_instructions();
-    exit;
-  }
+    if ($args{'h'}) {
+	print_instructions();
+	exit;
+    }
 
-  my %config = ();
-  my @filenames = ();
+    my %config = ();
+    my @filenames = ();
 
-  $config{graphviz} = (defined $args{'z'}) ? 1 : 0;
-  $config{language} = (defined $args{'l'}) ? $args{'l'} : "perl";
-  $config{silent}   = (defined $args{'S'}) ? 1 : 0;
-  $config{graphvizdia} = (defined $args{'Z'}) ? 1 : 0;
-  $config{vcg} = (defined $args{'v'}) ? 1 : 0;
+    $config{graphviz} = (defined $args{'z'}) ? 1 : 0;
+    $config{language} = (defined $args{'l'}) ? $args{'l'} : "perl";
+    $config{silent}   = (defined $args{'S'}) ? 1 : 0;
+    $config{graphvizdia} = (defined $args{'Z'}) ? 1 : 0;
+    $config{vcg} = (defined $args{'v'}) ? 1 : 0;
 
-  $config{singlefile} = (defined $args{'F'}) ? 1 : 0;
-  $config{skipcvs} = (defined $args{'C'}) ? 1 : 0;
+    $config{singlefile} = (defined $args{'F'}) ? 1 : 0;
+    $config{skipcvs} = (defined $args{'C'}) ? 1 : 0;
 
-  $config{username} = (defined $args{'U'}) ? $args{'U'} : "root";
-  $config{password} = (defined $args{'P'}) ? $args{'P'} : "";
+    $config{username} = (defined $args{'U'}) ? $args{'U'} : "root";
+    $config{password} = (defined $args{'P'}) ? $args{'P'} : "";
 
-  $config{methods}  = 1;
-  $config{attributes} = 1;
-  $config{public} = (defined $args{'H'}) ? 1 : 0;
+    $config{methods}  = 1;
+    $config{attributes} = 1;
+    $config{public} = (defined $args{'H'}) ? 1 : 0;
 
-  if ( $args{'m'} || $args{'A'}) {
-    $config{attributes} = 0;
-  }
+    if ( $args{'m'} || $args{'A'}) {
+	$config{attributes} = 0;
+    }
 
-  if ( $args{'M'} || $args{'a'}) {
-    $config{methods} = 0;
-  }
+    if ( $args{'M'} || $args{'a'}) {
+	$config{methods} = 0;
+    }
 
-  Autodia->setConfig(\%config);
+    Autodia->setConfig(\%config);
 
-  my %file_extensions = %{Autodia->getPattern()};
+    my %file_extensions = %{Autodia->getPattern()};
 
-  if (defined $args{'i'}) {
-    my $last;
-    if ($args{l} =~ /^dbi$/i) {
-      $filenames[0] = $args{'i'};
-    } else {
-      foreach my $filename ( split(" ",$args{'i'}) ) {
-	unless ( -f $filename ) {
+    if (defined $args{'i'}) {
+	my $last;
+	if ($args{l} =~ /^dbi$/i) {
+	    $filenames[0] = $args{'i'};
+	    warn "have file : $filenames[0]\n";
+	} else {
+	    foreach my $filename ( split(" ",$args{'i'}) ) {
+		unless ( -f $filename ) {
 
-	  if ($last) {
-	    $filename = "$last $filename";
-	    unless (-f $filename) {
-	      warn "cannot find $filename .. ignoring\n";
-	      $last = $filename;
-	      next;
+		    if ($last) {
+			$filename = "$last $filename";
+			unless (-f $filename) {
+			    warn "cannot find $filename .. ignoring\n";
+			    $last = $filename;
+			    next;
+			}
+		    } else {
+			$last = $filename;
+			warn "cannot find $filename .. ignoring\n";
+			next;
+		    }
+		}
+		undef $last;
+		push(@filenames,$filename);
 	    }
-	  } else {
-	    $last = $filename;
-	    warn "cannot find $filename .. ignoring\n";
-	    next;
-	  }
 	}
-	undef $last;
-	push(@filenames,$filename);
-      }
     }
-  } elsif (defined $args{'d'}) {
-    print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
-    my @dirs = split(" ",$args{'d'});
-    if (defined $args{'r'}) {
-      print "recursively searching files..\n" unless ( $config{silent} );
-      find ( { wanted => sub {
-		 unless (-d) {
-		   my $regex = $file_extensions{regex};
-		   push @filenames, $File::Find::name
-		     if ($File::Find::name =~ m/$regex/);
-		 }
-	       },
-	       preprocess => sub {
-		 my @return;
-		 foreach (@_) {
-		   push(@return,$_) unless (m/^.*\/?CVS$/ && $config{skipcvs});
-		 }
-		 return @return;
-	       },
-	     }, @dirs );
-    } else {
-      my @wildcards = @{$file_extensions{wildcards}};
-      print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
-      foreach my $directory (@dirs) {
-	if ($directory eq 'CVS' and $config{skipcvs}) {
-	  warn "skipping $directory\n" unless ( $config{silent} );
-	  next;
+    if (defined $args{'d'}) {
+	print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
+	my @dirs = split(" ",$args{'d'});
+	if (defined $args{'r'}) {
+	    print "recursively searching files..\n" unless ( $config{silent} );
+	    find ( { wanted => sub {
+			 unless (-d) {
+			     my $regex = $file_extensions{regex};
+			     push @filenames, $File::Find::name
+				 if ($File::Find::name =~ m/$regex/);
+			 }
+		     },
+		     preprocess => sub {
+			 my @return;
+			 foreach (@_) {
+			     push(@return,$_) unless (m/^.*\/?(CVS|RCS)$/ && $config{skipcvs});
+			 }
+			 return @return;
+		     },
+		   }, @dirs );
+	} else {
+	    my @wildcards = @{$file_extensions{wildcards}};
+	    print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
+	    foreach my $directory (@dirs) {
+		if ($directory =~ m/^(CVS|RCS)/ and $config{skipcvs}) {
+		    warn "skipping $directory\n" unless ( $config{silent} );
+		    next;
+		}
+		print "searching $directory\n" unless ( $config{silent} );
+		$directory =~ s|(.*)\/$|$1|;
+		foreach my $wildcard (@wildcards) {
+		    print "$wildcard" unless ( $config{silent} );
+		    print " .. " , <$directory/*.$wildcard>, " \n";
+		    push @filenames, <$directory/*.$wildcard>;
+		}
+	    }
 	}
-	print "searching $directory\n" unless ( $config{silent} );
-	$directory =~ s|(.*)\/$|$1|;
-	foreach my $wildcard (@wildcards) {
-	  print "$wildcard" unless ( $config{silent} );
-	  print " .. " , <$directory/*.$wildcard>, " \n";
-	  push @filenames, <$directory/*.$wildcard>;
-	}
-      }
     }
-  } elsif (@ARGV) {
-    @filenames = @ARGV;
-  } else {
-    print_instructions();
-    exit;
-  }
+    my $inputpath = "";
+    if (defined $args{'p'}) {
+	$inputpath = $args{'p'};
+	unless ($inputpath =~ m/\/$/)
+	    {
+		$inputpath .= "/";
+	    }
+    }
+    $config{inputpath} = $inputpath;
 
-  $config{filenames}    = \@filenames;
-  $config{use_stdout}   = (defined $args{'O'}) ? 1 : 0;
-  $config{templatefile} = (defined $args{'t'}) ? $args{'t'} : undef;
-  $config{outputfile}   = (defined $args{'o'}) ? $args{'o'} : "autodia.out.xml";
-  $config{no_deps}      = (defined $args{'D'}) ? 1 : 0;
-  $config{sort}         = (defined $args{'s'}) ? 1 : 0;
 
-  my $inputpath = "";
-  if (defined $args{'p'}) {
-    $inputpath = $args{'p'};
-    unless ($inputpath =~ m/\/$/)
-      {
-	$inputpath .= "/";
-      }
-  }
+    unless (defined $args{'d'} || $args{'i'} || $args{'p'}) {
+	if (@ARGV) {
+	    @filenames = @ARGV;
+	} else {
+	    print_instructions();
+	    exit;
+	}
+    }
+    $config{filenames}    = \@filenames;
+    $config{use_stdout}   = (defined $args{'O'}) ? 1 : 0;
+    $config{templatefile} = (defined $args{'t'}) ? $args{'t'} : undef;
+    $config{outputfile}   = (defined $args{'o'}) ? $args{'o'} : "autodia.out.xml";
+    $config{no_deps}      = (defined $args{'D'}) ? 1 : 0;
+    $config{sort}         = (defined $args{'s'}) ? 1 : 0;
 
-  $config{inputpath}    = $inputpath;
-
-  return \%config;
+    return \%config;
 }
 
 sub print_instructions {

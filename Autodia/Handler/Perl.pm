@@ -11,6 +11,8 @@ require Exporter;
 
 use strict;
 
+use Data::Dumper;
+
 use vars qw($VERSION @ISA @EXPORT);
 use Autodia::Handler;
 
@@ -41,10 +43,17 @@ sub _parse {
   my $filename = shift;
   my $Diagram  = $self->{Diagram};
 
-  my $pkg_regexp = qr([\w:]+);
+  my $pkg_regexp = '[\w:]+';
 
   my $Class;
 
+  # Class::Tangram bits
+  $self->{_is_tangram_class} = {};
+  $self->{_in_tangram_class} = 0;
+  my $pat1 = '[\'\"]?\w+[\'\"]?\s*=>\s*\{.*?\}';
+  my $pat2 = '[\'\"]?\w+[\'\"]?\s*=>\s*undef';
+
+  # pod
   $self->{pod} = 0;
 
   # parse through file looking for stuff
@@ -78,6 +87,9 @@ sub _parse {
 	  # create superclass
 	  my $Superclass = Autodia::Diagram::Superclass->new($super);
 	  # add superclass to diagram
+
+
+	  $self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
 
 	  my $exists_already = $Diagram->add_superclass($Superclass);
 #	  warn "already exists ? $exists_already \n";
@@ -165,6 +177,7 @@ sub _parse {
 	      if (ref $exists_already) {
 		  $Superclass = $exists_already;
 	      }
+	      $self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
 	      # create new inheritance
 #	      warn "creating inheritance from superclass : $super\n";
 	      my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
@@ -178,6 +191,75 @@ sub _parse {
       } else { warn "ignoring empty \@ISA \n"; }
   }
 
+  # Handle Class::Tangram classes
+  if (defined $self->{_is_tangram_class}{$Class->Name}) {
+      if ($line =~ /^\s*(?:our|my)?\s+\$fields\s(.*)$/) {
+	  $self->{_field_string} = '';
+	  warn "tangram parser : found start of fields for ",$Class->Name,"\n";
+	  $self->{_field_string} = $1;
+	  warn "field_string : $self->{_field_string}\n";
+	  $self->{_in_tangram_class} = 1;
+	  if ( $line =~ /^(.*\}\s*;)/) {
+	      warn "found end of fields for  ",$Class->Name,"\n";
+	      $self->{_in_tangram_class} = 2;
+	  }
+      }
+      if ($self->{_in_tangram_class}) {
+
+	  if ( $line =~ /^(.*\}\s*;)/ && $self->{_in_tangram_class} == 1) {
+	      warn "found end of fields for  ",$Class->Name,"\n";
+	      $self->{_field_string} .= $1;
+	      $self->{_in_tangram_class} = 2;
+	  } else {
+	      warn "adding line to fields for  ",$Class->Name,"\n";
+	      $self->{_field_string} .= $line unless ($self->{_in_tangram_class} == 2);
+	  }
+	  if ($self->{_in_tangram_class} == 2) {
+	      warn "processing fields for ",$Class->Name,"\n";
+	      $_ = $self->{_field_string};
+	      s/^\s*\=\s*\{\s//;
+	      s/\}\s*;$//;
+	      s/[\s\n]+/ /g;
+	      warn "fields : $_\n";
+	      my %field_types = m/(\w+)\s*=>\s*[\{\[]\s*($pat1|$pat2|qw\([\w\s]+\))[\s,]*[\}\]]\s*,?\s*/g;
+
+	      warn Dumper(field_types=>%field_types);
+	      foreach my $field_type (keys %field_types) {
+		  warn "handling $field_type..\n";
+		  $_ = $field_types{$field_type};
+		  my $pat1 = '\'\w+\'\s*=>\s*\{.*?\}';
+		  my $pat2 = '\'\w+\'\s*=>\s*undef';
+		  my %fields;
+		  if (/qw\((.*)\)/) {
+		      my $fields = $1;
+		      warn "qw fields : $fields\n";
+		      my @fields = split(/\s+/,$fields);
+		      @fields{@fields} = @fields;
+		  } else {
+		      %fields = m/[\'\"]?(\w+)[\'\"]?\s*=>\s*([\{\[].*?[\}\]]|undef)/g;
+		  }
+		  warn Dumper(fields=>%fields);
+		  foreach my $field (keys %fields) {
+		      warn "found field : '$field' of type '$field_type' in (class ",$Class->Name,") : \n";
+		      my $attribute = { name=>$field, type=>$field_type };
+		      if ($fields{$field} =~ /class\s*=>\s*[\'\"](.*?)[\'\"]/) {
+			  $attribute->{type} = $1;
+		      }
+		      if ($fields{$field} =~ /init_default\s*=>\s*[\'\"](.*?)[\'\"]/) {
+			  $attribute->{default} = $1;
+			  # FIXME : attribute default values unsupported ?
+		      }
+		      $attribute->{visibility} = ( $attribute->{name} =~ m/^\_/ ) ? 1 : 0;
+
+		      $Class->add_attribute($attribute);
+		  }
+
+	      }
+	      $self->{_in_tangram_class} = 0;
+	  }
+      }
+
+  }
     # if line contains sub then parse for method data
     if ($line =~ /^\s*sub\s+?(\w+)/) {
       my $subname = $1;

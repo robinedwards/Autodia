@@ -1,5 +1,16 @@
 Changes to AutoDia
 ------------------
+version 1.12 17/03/2004
+- fixes to SQL handler to support more types and match better
+- fixed autodia.pl to allow -i and -d at the same time
+- skipcvs option now also skips RCS dirs
+- fix to C++ handler to cope with comments like /* .. */ on single line
+- fixes to Torque handler
+- added umbrello input handler
+- synchronised autodia_java.pl with autodia.pl
+
+version 1.11 23/12/2003
+- added experimental support for Class::Tangram
 
 version 1.10 22/12/2003
 - fixed object attributes bug in Perl Handler

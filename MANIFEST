@@ -29,4 +29,5 @@ Autodia/Handler/SQL.pm
 Autodia/Handler/dia.pm
 Autodia/Handler/Torque.pm
 Autodia/Handler/python.pm
+Autodia/Handler/umbrello.pm
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.10";
+        $VERSION = "1.12";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -45,6 +45,7 @@ sub getHandlers
 		    "sql"       => 'Autodia::Handler::SQL',
 		    "torque"    => 'Autodia::Handler::Torque',
 		    "python"    => 'Autodia::Handler::python',
+		    "umbrello"  => 'Autodia::Handler::umbrello',
 		   );
     print "getting handlers..\n" unless ( $config{silent} );
     return \%handlers;
@@ -88,6 +89,19 @@ sub getPattern
 		wildcards => [ 'py', ]
 		);
 
+ my %dia    = ( regex   => '\w+.dia',
+		 wildcards => ['dia'],
+		);
+
+ my %sql    = ( regex   => '\w+.sql',
+                 wildcards => ['sql'],
+                );
+
+
+  my %umbrello = ( regex => '\w+.xmi',
+		   wildcards =>  ['xmi'],
+		);
+
   my %patterns = (
 		  "perl" => \%perl,
 		  'c++'  => \%cpp,
@@ -95,10 +109,11 @@ sub getPattern
 		  "java" => \%java,
 		  "php"  => \%php,
 		  "dbi"  => {},
-		  "dia"  => {},
-		  "sql"  => {},
+		  "dia"  => \%dia,
+		  "sql"  => \%sql,
 		  "torque" => {},
 		  "python" => \%python,
+		  "umbrello" => \%umbrello,
 		 );
 
   return \%{$patterns{$language}};

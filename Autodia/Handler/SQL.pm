@@ -23,9 +23,9 @@ use Data::Dumper;
 
 my %data_types = (
 		  varchar => [qw/varchar2 nvarchar/],
-		  integer => [qw/longint shortint int/],
+		  integer => [qw/longint shortint int bigint tinyint/],
 		  text    => [qw/ntext/],
-		  float   => [qw/long curr/],
+		  float   => [qw/long curr double/],
 		  date    => [qw/datetime smalldate smalldatetime time/],
 		 );
 
@@ -58,7 +58,7 @@ sub _parse {
     next if ($self->_discard_line($fileline)); # discard comments and garbage
     # If we have a create line, then we need to finish off the
     # last table (if any) and start a new one.
-    if ($fileline =~ /create table (.*) \(?/i) {
+    if ($fileline =~ /create table (.*?) \(?/i) {
       $table = $1;
       print "found new table : $table \n";
       # create new 'class' representing table

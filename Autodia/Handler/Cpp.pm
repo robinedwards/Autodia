@@ -459,6 +459,13 @@ sub _discard_line
 	    last SWITCH;
 	}
 
+	 # if line is a comment discard
+        if ($line =~ m!^\s*/\*.*\*/!)
+        {
+            $discard = 1;
+            last SWITCH;
+        }
+
 	# if line starts with multiline comment syntax discard and set flag
 	if ($line =~ /^\s*\/\*/)
 	{

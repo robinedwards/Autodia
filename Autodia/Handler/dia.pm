@@ -102,7 +102,7 @@ sub _parse {
       # add dependancy to diagram
       $Diagram->add_dependancy($Dependancy);
       # add dependancy to class
-      $entity{$connection->{to}}->add_dependancy($Dependancy);
+      $entity{$connection->{from}}->add_dependancy($Dependancy);
       # add dependancy to component
       $entity{$connection->{to}}->add_dependancy($Dependancy);
     }
