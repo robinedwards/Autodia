@@ -1,6 +1,10 @@
 Changes to AutoDia
 ------------------
 
+version 2.01 13/10/2004
+- improved perl handler support for 'fields' and 'base' pragma
+- applied Chris Karakas' fixes to Diagram module, PHP and Perl handlers
+
 version 2.00 14/07/2004
 - added umbrello output (experimental - doesn't seem to work)
 - fixed Perl Handler to cope with perl scripts as well as modules [bug reported via debian]

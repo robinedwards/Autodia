@@ -27,6 +27,7 @@ my %dot_filetypes = (
 		     jpeg => 'as_jpeg',
 		     dot => 'as_canon',
 		     svg => 'as_svg',
+		     fig => 'as_fig',
 		    );
 
 my %vcg_filetypes = (
@@ -386,7 +387,14 @@ sub export_graphviz
 	    next if ($attribute->{visibility} == 1 && $config{public});
 	    $node .= ($attribute->{visibility} == 0) ? '+ ' : '- ';
 	    $node .= $attribute->{name};
-	    $node .= " : ".$attribute->{type}.'\l';
+
+	    # Check if $attribute->{type} is defined.
+            # Otherwise we get warnings like:
+            if (defined $attribute->{type}) {
+              $node .= " : ".$attribute->{type}.'\l';
+            } else {
+              $node .= '\l';
+            }
 	  }
 	}
 
@@ -720,8 +728,8 @@ sub export_xml
 	  $method->{name}=xml_escape($method->{name});
 	  if (ref $method->{"Param"} ) {
 	    foreach my $argument ( @{$method->{"Param"}} ) {
-	      $argument->{Type} = xml_escape($argument->{Type});
-	      $argument->{Name} = xml_escape($argument->{Name});
+		$argument->{Type} = xml_escape($argument->{Type}) if (defined $argument->{Type});
+		$argument->{Name} = xml_escape($argument->{Name});
 	    }
 	  }
 	}
@@ -1052,64 +1060,67 @@ sub _layout_dia_new {
       $nodes{$node}{xx} = $x;
       $nodes{$node}{yy} = $y;
       $nodes{$node}{entity}->set_location($x,$y);
-      if (scalar @{$nodes{$node}{children}} && ( scalar @{$rows[1]} > 0)) {
-	  my @sorted_children = sort {
-	      $nodes{$b}{weight} <=> $nodes{$a}{weight}
-	  } @{$nodes{$node}{children}};
-	  unshift (@sorted_children, pop(@sorted_children));
-	  my $child_increment = $widest_row / (scalar @{$rows[1]});
-	  my $childpos = $child_increment;
-	  #      foreach my $child (@{$nodes{$node}{children}}) {
-	  foreach my $child (@sorted_children) {
-	      my $side;
-	      if ($childpos <= ( $widest_row * 0.385 ) ) {
-		  $side = 'left';
-	      } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
-		  $side = 'center';
-	      } else {
-		  $side = 'right';
+      #      if (scalar @{$nodes{$node}{children}} && ( scalar @{$rows[1]} > 0)) {
+      if (defined $nodes{$node}{children} && defined $rows[1]) {
+	  if (scalar @{$nodes{$node}{children}} && scalar(@rows) && ( scalar @{$rows[1]} > 0)) {
+
+	      my @sorted_children = sort {
+		  $nodes{$b}{weight} <=> $nodes{$a}{weight}
+	      } @{$nodes{$node}{children}};
+	      unshift (@sorted_children, pop(@sorted_children));
+	      my $child_increment = $widest_row / (scalar @{$rows[1]});
+	      my $childpos = $child_increment;
+	      #      foreach my $child (@{$nodes{$node}{children}}) {
+	      foreach my $child (@sorted_children) {
+		  my $side;
+		  if ($childpos <= ( $widest_row * 0.385 ) ) {
+		      $side = 'left';
+		  } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
+		      $side = 'center';
+		  } else {
+		      $side = 'right';
+		  }
+		  plot_branch($self,$nodes{$child},$childpos,$side);
+		  $childpos += $child_increment;
 	      }
-	      plot_branch($self,$nodes{$child},$childpos,$side);
-	      $childpos += $child_increment;
-	  }
-      } elsif ( scalar @{$rows[1]} && $done2ndrow == 0) {
-	  $done2ndrow = 1;
-	  foreach my $node ( @{$rows[1]} ) {
-	      #		warn "handling node in next row\n";
-	      #		warn Dumper(node=>$node{$node});
-	  
-	      my $x = 0 - ( $self->{_dia_row_widths}[1] * $self->{_dia_widest_row} / 2)
-		  + ($pos * $self->{_dia_row_widths}[1]);
-	      $nodes{$node}{x} = $x;
-	      $nodes{$node}{'y'} = $y;
-	      if (scalar @{$nodes{$node}{children}} && scalar @{$rows[2]}) {
-		  my @sorted_children = sort {
-		      $nodes{$b}{weight} <=> $nodes{$a}{weight}
-		  } @{$nodes{$node}{children}};
-		  unshift (@sorted_children, pop(@sorted_children));
-		  my $child_increment = $widest_row / (scalar @{$rows[2]});
-		  my $childpos = $child_increment;
-		  #      foreach my $child (@{$nodes{$node}{children}}) {
-		  foreach my $child (@sorted_children) {
-		      #			warn "child : $child\n";
-		      next unless ($child);
-		      my $side;
-		      if ($childpos <= ( $widest_row * 0.385 ) ) {
-			  $side = 'left';
-		      } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
-			  $side = 'center';
-		      } else {
-			  $side = 'right';
+	  } elsif ( scalar @{$rows[1]} && $done2ndrow == 0) {
+	      $done2ndrow = 1;
+	      foreach my $node ( @{$rows[1]} ) {
+		  #		warn "handling node in next row\n";
+		  #		warn Dumper(node=>$node{$node});
+		  my $x = 0 - ( $self->{_dia_row_widths}[1] * $self->{_dia_widest_row} / 2)
+		      + ($pos * $self->{_dia_row_widths}[1]);
+		  $nodes{$node}{x} = $x;
+		  $nodes{$node}{'y'} = $y;
+		  if (scalar @{$nodes{$node}{children}} && scalar @{$rows[2]}) {
+		      my @sorted_children = sort {
+			  $nodes{$b}{weight} <=> $nodes{$a}{weight}
+		      } @{$nodes{$node}{children}};
+		      unshift (@sorted_children, pop(@sorted_children));
+		      my $child_increment = $widest_row / (scalar @{$rows[2]});
+		      my $childpos = $child_increment;
+		      #      foreach my $child (@{$nodes{$node}{children}}) {
+		      foreach my $child (@sorted_children) {
+			  #			warn "child : $child\n";
+			  next unless ($child);
+			  my $side;
+			  if ($childpos <= ( $widest_row * 0.385 ) ) {
+			      $side = 'left';
+			  } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
+			      $side = 'center';
+			  } else {
+			      $side = 'right';
+			  }
+			  plot_branch($self,$nodes{$child},$childpos,$side);
+			  $childpos += $child_increment;
 		      }
-		      plot_branch($self,$nodes{$child},$childpos,$side);
-		      $childpos += $child_increment;
 		  }
 	      }
 	  }
       }
-      
+
       $nodes{$node}{pos} = $pos;
-      
+
       $pos += $increment;
       $done{$node} = 1;
   }

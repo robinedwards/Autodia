@@ -57,11 +57,15 @@ sub _parse {
     $self->{pod} = 0;
 
     # parse through file looking for stuff
+    my $continue_base = 0;
+    my $continue_fields = 0;
+
     foreach my $line (<$fh>) {
 	chomp $line;
 	if ($self->_discard_line($line)) {
 	    next;
 	}
+
 
 	# if line contains package name then parse for class name
 	if ($line =~ /^\s*package\s+($pkg_regexp)/) {
@@ -72,8 +76,30 @@ sub _parse {
 	    $Class = $Diagram->add_class($Class);
 	}
 
-	if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\s*([\(\{\/\#])\s*(.*)\s*[\)\}\1]/) {
+	if ($line =~ /^\s*use\s+base\s+(?:q|qw|qq){0,1}\s*([\'\"\(\{\/\#])\s*(.*)\s*([\)\}\1]?)/ or $continue_base) {
 	    my $superclass = $2;
+	    if ($continue_base) {
+		warn "continuing base\n";
+		$continue_base =~ s/[\)\}\'\"]/\\1/;
+		warn "base ctd : $continue_base\n";
+		warn "superclass : $superclass\n";
+		if ( $line =~ /(.*)\s*$continue_base?/ ) {
+		    $continue_base = 0;
+		    $superclass = $1;
+		    warn "end of continued base\n";
+		}
+	    } else {
+		warn "start of base\n";
+		warn "superclass : $superclass\n";
+		$continue_base = '[\)\}\'\"]';
+		if ($superclass =~ /(.*)([\)\}\'\"])/) {
+		    $superclass = $1;
+		    $continue_base = 0;
+		    warn "base is only 1 line\n";
+		}
+		warn "continue base : $continue_base\n";
+	    }
+	    warn "superclass : $superclass\n";
 
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
@@ -124,11 +150,29 @@ sub _parse {
 	    $self->_is_package(\$Class, $filename);
 
 
-	    if ($componentName =~ /(fields|private|public)/) {
-		my $pragma = $1;
-		$line =~ /\sqw\((.*)\)/;
-		my @fields = split(/\s+/,$1);
+	    if ($line =~ /\s*use\s+(fields|private|public)\s+(?:q|qw|qq){0,1}\s*([\'\"\(\{\/\#])\s*(.*)\s*([\)\}\1]?)/ or $continue_fields) {
+		my ($pragma,$fields) = ($1,$3);
+		warn "pragma : $pragma .. fields : $fields\n";
+		if ($continue_fields) {
+		    $continue_fields =~ s/[\)\}\'\"]/\\1/;
+		    warn "fields ctd : $continue_fields\n";
+		    if ( $line =~ m/(.*)\s*$continue_fields?/ ) {
+			$continue_fields = 0;
+			$fields = $1;
+		    }
+		} else {
+		    $continue_fields = '[\)\}\'\"]';
+		    if ($fields =~ /(.*)([\)\}\1])/) {
+			$continue_fields = 0;
+			$fields = $1;
+		    }
+		    warn "continue fields : $continue_fields\n";
+		}
+		warn "fields : $fields\n";
+
+		my @fields = split(/\s+/,$fields);
 		foreach my $field (@fields) {
+		    warn "fields : $field\n";
 		    my $attribute_visibility = ( $field =~ m/^\_/ ) ? 1 : 0;
 		    unless ($pragma eq 'fields') {
 			$attribute_visibility = ($pragma eq 'private' ) ? 1 : 0;
@@ -163,7 +207,8 @@ sub _parse {
 	# if ISA in line then extract templates/superclasses
 	if ($line =~ /^\s*\@(?:\w+\:\:)*ISA\s*\=\s*(?:q|qw){0,1}\((.*)\)/) {
 	    my $superclass = $1;
-      
+	    $superclass =~ s/[\'\",]//g;
+
 	    #      warn "handling superclasses $1 with \@ISA\n";
 	    #      warn "superclass line : $line \n";
 	    if ($superclass) {

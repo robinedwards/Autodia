@@ -69,7 +69,7 @@ sub _parse
 	  $incomment = 0;
 	}
 	next if $incomment;
-
+	$line =~ s|\/\/.*$||;
 
 	my $up = $line =~ tr/\{/\{/;
 	my $down = $line =~ tr/\}/\}/;
@@ -228,7 +228,7 @@ sub _parse
 		  my @parameters;
 		  foreach my $par (@parameters1) {
 		    my ($name, $val) = split (/=/, $par);
-		    $val =~ s/["']//g;
+		    $val =~ s/["']//g if (defined $val);
 		    $name =~ s/&//g;
 		    my %temphash = (
 				 Name => $name,
