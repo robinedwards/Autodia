@@ -1,5 +1,9 @@
 Changes to AutoDia
 ------------------
+
+version 1.99 19/03/2004
+- rebadged 1.12 to meet version number requirements on cpan
+
 version 1.12 17/03/2004
 - fixes to SQL handler to support more types and match better
 - fixed autodia.pl to allow -i and -d at the same time
