@@ -1,12 +1,22 @@
 Changes to AutoDia
 ------------------
 
-version 1.6 30/03/2002
+version 1.7 13/07/2003
+- added Torque handler
+- added Python handler (experimental)
+- applied small perl handler patch from Scott Lanning
+- small improvement to perl handler to improve support for 'use base'
+- applied php handler patch from <INSERT NICE BLOKES NAME HERE>
+- fixed documentation for php handler
+- new Dia layout algorithm based on directed graphs (huge improvement)
+- fix to DBI handler to improve support for oracle and postgres
+
+version 1.6 30/03/2003
 - fixed SQL handler
 - improved test suite
 
 
-version 1.5 28/03/2002
+version 1.5 28/03/2003
 - fixes to DBI handler 
 - added SQL handler
 - fixes to c++ handler
@@ -16,7 +26,7 @@ version 1.5 28/03/2002
 - added new option to hide private/hidden attributes/methods
 - tidied up code and distribution
 
-version 1.4 12/02/2002
+version 1.4 12/02/2003
 - Added better support for GraphViz and output in png, jpg and dot
 - added experimental support for VCG
 - some small improvements to C++ and perl handlers

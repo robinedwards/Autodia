@@ -78,13 +78,13 @@ sub _parse
 	$inclass = 0 if ($inclassparen < 1);
 	$infunc = 0 if ($infuncparen < 1);
 
-	print "$inclassparen : $inclass $infuncparen : $infunc \n";
+#	print "$inclassparen : $inclass $infuncparen : $infunc \n";
 
 	if ($line =~ /^\s*class\s+([^\s\(\)\{\}]+)/) {
 	  my $className = $1;
 	  $inclass = 1;
 	  $inclassparen = $up - $down;
-	  print "Classname: $className matched on:\n$line\n";
+#	  print "Classname: $className matched on:\n$line\n";
 	  $Class = Autodia::Diagram::Class->new($className);
 	  # add to diagram
 	  $Diagram->add_class($Class);
@@ -118,10 +118,10 @@ sub _parse
 
 	}
 
-	if ($line =~ /^\s*(include|require)\s+\(*\"*([^\"\)]+)\"*\)*/) {
+	if ($line =~ /^\s*(include|require|include_once|require_once)\s+\(*["']?([^\"\'\)]+)["']?\)*/) {
 	  my $componentName = $2;
 
-	  print "componentname: $componentName matched on:\n$line\n";
+#	  print "componentname: $componentName matched on:\n$line\n";
 	  # discard if stopword
 	  next if ($componentName =~ /(strict|vars|exporter|autoloader|data::dumper)/i);
 
@@ -151,7 +151,7 @@ sub _parse
 	if ($line =~ /^.*=\s*new\s+([^\s\(\)\{\}\;]+)/) {
 	  my $componentName = $1;
 
-	  print "componentname: $componentName matched on:\n$line\n";
+#	  print "componentname: $componentName matched on:\n$line\n";
 	  # discard if stopword
 	  next if ($componentName =~ /(strict|vars|exporter|autoloader|data::dumper)/i);
 
@@ -190,7 +190,7 @@ sub _parse
 	      $default =~ s/(.*)\/\/.*/$1/;
 	      $default =~ s/(.*)\/\*.*/$1/;
 	    }
-	    print "Attr found: $attribute_name = $default\n$line\n";
+#	    print "Attr found: $attribute_name = $default\n$line\n";
 	    my $attribute_visibility = ( $attribute_name =~ m/^\_/ ) ? 1 : 0;
 	    $Class->add_attribute({
 				   name => $attribute_name,
@@ -201,11 +201,9 @@ sub _parse
 	}
 
 	# if line contains sub then parse for method data
-	if ($line =~ /^\s*function\s+([^\s\(\)]+)/)
-	  {
-	    unless ($inclass) {
-	      my @newclass = reverse split (/\//, $filename);
-
+	if ($line =~ /^\s*function\s+&?([^\s\(\)]+)/) {
+	  unless ($inclass) {
+	    my @newclass = reverse split (/\//, $filename);
 	      $Class = Autodia::Diagram::Class->new($newclass[0]);
 	      # add to diagram
 	      $Diagram->add_class($Class);
@@ -215,7 +213,7 @@ sub _parse
 	      my $subname = $1;
 	      $infunc = 1;
 	      $infuncparen = $up - $down;
-	      print "Function found: $subname\n$line\n";
+#	      print "Function found: $subname\n$line\n";
 	      my %subroutine = ( "name" => $subname, );
 	      $subroutine{"visibility"} = ($subroutine{"name"} =~ m/^\_/) ? 1 : 0;
 	      # check for explicit parameters
@@ -225,12 +223,13 @@ sub _parse
 
 		  $parameter_string =~ s/\s*//g;
 		  $parameter_string =~ s/\$//g;
-		  print "Params: $parameter_string\n";
+#		  print "Params: $parameter_string\n";
 		  my @parameters1 = split(",",$parameter_string);
 		  my @parameters;
 		  foreach my $par (@parameters1) {
 		    my ($name, $val) = split (/=/, $par);
-		    $val =~ s/\"//g;
+		    $val =~ s/["']//g;
+		    $name =~ s/&//g;
 		    my %temphash = (
 				 Name => $name,
 				 Val => $val,
@@ -240,7 +239,7 @@ sub _parse
 		  }
 		  $subroutine{"Param"} = \@parameters;
 		}
-	    print Dumper(\%subroutine);
+#	    print Dumper(\%subroutine);
 	    $Class->add_operation(\%subroutine);
 	  }
 
@@ -323,14 +322,14 @@ sub _is_package
 
 =head1 NAME
 
-HandlerPHP.pm - AutoDia handler for PHP
+Autodia::Handler::PHP - AutoDia handler for PHP
 
 =head1 INTRODUCTION
 
-HandlerPHP is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
+Autodia::Handler::PHP is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
 
 %language_handlers = ( .. ,
-		       php => "HandlerPHP",
+		       php => "Autodia::Handler::PHP",
 		       .. );
 
 %patterns = ( .. ,
@@ -340,16 +339,16 @@ HandlerPHP is registered in the Autodia.pm module, which contains a hash of lang
 my %php = (
              regex      => '\w+\.php$',
              wildcards => [
-                        "php",
-                                ],
+                        "php","php3","php4"
+                           ],
                         );
 
 
 =head1 CONSTRUCTION METHOD
 
-use HandlerPHP;
+use Autodia::Handler::PHP;
 
-my $handler = HandlerPHP->New(\%Config);
+my $handler = Autodia::Handler::PHP->New(\%Config);
 
 This creates a new handler using the Configuration hash to provide rules selected at the command line.
 

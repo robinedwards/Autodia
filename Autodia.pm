@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.6";
+        $VERSION = "1.7";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -43,6 +43,8 @@ sub getHandlers
 		    "dbi"       => 'Autodia::Handler::DBI',
 		    "dia"       => 'Autodia::Handler::dia',
 		    "sql"       => 'Autodia::Handler::SQL',
+		    "torque"    => 'Autodia::Handler::Torque',
+		    "python"    => 'Autodia::Handler::python',
 		   );
     print "getting handlers..\n" unless ( $config{silent} );
     return \%handlers;
@@ -81,6 +83,11 @@ sub getPattern
 			    ],
 	      );
 
+  my %python = (
+		regex    => '\w+.py$',
+		wildcards => [ 'py', ]
+		);
+
   my %patterns = (
 		  "perl" => \%perl,
 		  'c++'  => \%cpp,
@@ -88,6 +95,10 @@ sub getPattern
 		  "java" => \%java,
 		  "php"  => \%php,
 		  "dbi"  => {},
+		  "dia"  => {},
+		  "sql"  => {},
+		  "torque" => {},
+		  "python" => \%python,
 		 );
 
   return \%{$patterns{$language}};

@@ -1,4 +1,3 @@
-
 ################################################################
 # Autodial - Automatic Dia XML.   (C)Copyright 2001 A Trevena  #
 #                                                              #
@@ -568,7 +567,6 @@ sub export_vcg {
 }
 
 
-
 ####################################################
 # export_xml - output to file via template toolkit
 
@@ -585,23 +583,21 @@ sub export_xml
     if ($config{no_deps})
       { $self->_no_deps; }
 
-    $self->_layout;     # calculate the positions of the elements within diagram
+    $self->_layout_dia_new; # calculate positions of the elements using new method
+#    $self->_layout;     # calculate the positions of the elements within diagram
 
     if (ref $self->Classes) {
       foreach my $Class ( @{$self->Classes} ) {
 
-	warn "handling $Class->{name}\n";
+#	warn "handling $Class->{name}\n";
 
  	my ($methods) = ($Class->Operations);
 	foreach my $method (@$methods) {
 	  $method->{name}=xml_escape($method->{name});
-	  warn "..escaped $method->{name}\n";
 	  if (ref $method->{"Param"} ) {
 	    foreach my $argument ( @{$method->{"Param"}} ) {
 	      $argument->{Type} = xml_escape($argument->{Type});
-	      warn "..escaped $argument->{Type}\n";
 	      $argument->{Name} = xml_escape($argument->{Name});
-	      warn "..escaped $argument->{Name}\n";
 	    }
 	  }
 	}
@@ -609,7 +605,6 @@ sub export_xml
 	my ($attributes) = ($Class->Attributes);
 	foreach my $attribute (@$attributes) {
 	  $attribute->{name} = xml_escape($attribute->{name});
-	  warn ".. escaped $attribute->{name} \n";
 	}
       }
     }
@@ -782,172 +777,489 @@ sub _sort
     return \@sorted_classes
   }
 
-sub _layout
-  {
-    my $self = shift;
-    my @columns;
-    my @orphan_classes;
-    my $column_count=0;
 
-    # populate a grid to be used for laying out the diagram.
-
-    # put each parent class in a column
-    my @parent_classes = $self->_get_parent_classes;
-    my %parent_class;
-    foreach my $class (@parent_classes)
-      {
-	$parent_class{$class->Id} = $column_count;
-	if (defined $columns[$column_count][2][0])
-	  { push (@{$columns[$column_count][2]},$class); }
-	else
-	  { $columns[$column_count][2][0] = $class; }
-	$column_count++;
+sub _layout_dia_new {
+  my $self = shift;
+  my %config          = %{$self->{_config}};
+  # build table of nodes and relationships
+  my %nodes;
+  my @edges;
+  my @rows;
+  my @row_heights;
+  my @row_widths;
+  # - add classes nodes
+  my $classes = $self->Classes;
+  if (ref $classes) {
+    foreach my $Class (@$classes) {
+      # count methods and attributes to give height
+      my $height = 23;
+      my $width = 3 + ( (length ($Class->Name) - 3) * 0.75 );
+      my ($methods) = ($Class->Operations);
+      if (uc(ref $methods) eq 'SCALAR') {
+	$height += scalar @$methods;
       }
+      if ($config{attributes}) {
+	my ($attributes) = ($Class->Attributes);
+	if (uc(ref $attributes) eq 'SCALAR') {
+	  $height += (scalar @$attributes * 3.2);
+	}
+      }
+      $nodes{$Class->Id} = {parents=>[], weight=>0, center=>[], height=>$height,
+			    children=>[], entity=>$Class, width=>$width};
+    }
+  }
+  # - add superclasses nodes
+  my $superclasses = $self->Superclasses;
+  if (ref $superclasses) {
+    foreach my $Superclass (@$superclasses) {
+      my $width = 3 + ( (length ($Superclass->Name) - 3) * 0.75 );
+      $nodes{$Superclass->Id} = {parents=>[], weight=>0, center=>[], height=>18,
+				 children=>[], entity=>$Superclass, width=>$width};
+    }
+  }
+  # - add package nodes
+  my $components = $self->Components;
+  if (ref $components) {
+    foreach my $Component (@$components) {
+      my $width = 3 + ( (length ($Component->Name) - 3) * 0.55 );
+      $nodes{$Component->Id} = {parents=>[], weight=>0, center=>[], height=>18,
+				children=>[], entity=>$Component, width=>$width};
+    }
+  }
+  # - add inheritance edges
+  my $inheritances = $self->Inheritances;
+  if (ref $inheritances) {
+    foreach my $Inheritance (@$inheritances) {
+      push (@edges, { to => $Inheritance->Child, from => $Inheritance->Parent  });
+    }
+  }
+  # - add dependancy edges
+  my $dependancies = $self->Dependancies;
+  if (ref $dependancies) {
+    foreach my $Dependancy (@$dependancies) {
+      push (@edges, { to => $Dependancy->Child, from => $Dependancy->Parent  });
+    }
+  }
 
-    $column_count = 0;
+  # first pass (build network of edges to and from each node)
+  foreach my $edge (@edges) {
+    my ($from,$to) = ($edge->{from},$edge->{to});
+    push(@{$nodes{$to}{parents}},$from);
+    push(@{$nodes{$from}{children}},$to);
+  }
 
-    my @childless_classes = $self->_get_childless_classes;
-    # put each child class in its parent column
-    foreach my $class (@childless_classes)
-      {
-	if (defined $class->Inheritances)
-	  {
-	    my ($inheritance) = $class->Inheritances;
-	    my $parents_column = $parent_class{$inheritance->Parent} || 0;
-	    push (@{$columns[$parents_column][3]},$class);
+  # second pass (establish depth ( ie verticle placement of each node )
+  foreach my $node (keys %nodes) {
+    my $depth = 0;
+    foreach my $parent (@{$nodes{$node}{parents}}) {
+      my $newdepth = get_depth($parent,$node,\%nodes);
+      $depth = $newdepth if ($depth < $newdepth);
+    }
+    $nodes{$node}{depth} = $depth;
+    push(@{$rows[$depth]},$node)
+  }
+
+  # calculate height and width of diagram in descrete steps
+  my $i = 0;
+  my $widest_row = 0;
+  my $total_height = 0;
+  my $total_width = 0;
+  foreach my $row (@rows) {
+    my $tallest_node_height = 0;
+    my $widest_node_width = 0;
+    $widest_row = scalar @$row if ( scalar @$row > $widest_row );
+    foreach my $node (@$row) {
+      $tallest_node_height = $nodes{$node}{height} 
+	if ($nodes{$node}{height} > $tallest_node_height);
+      $widest_node_width = $nodes{$node}{width}
+	if ($nodes{$node}{width} > $widest_node_width);
+    }
+    $row_heights[$i] = $tallest_node_height + 0.5;
+    $row_widths[$i] = $widest_node_width;
+    $total_height += $tallest_node_height + 0.5 ;
+    $total_width += $widest_node_width;
+    $i++;
+  }
+
+  # prepare table of available positions
+  my @positions;
+  foreach (@rows) {
+    my %available;
+    @available{(0 .. ($widest_row + 1))} = 1 x ($widest_row + 1);
+    push (@positions,\%available);
+  }
+
+  my %done = ();
+  $self->{_dia_done} = \%done;
+  $self->{_dia_nodes} = \%nodes;
+  $self->{_dia_positions} = \@positions;
+  $self->{_dia_rows} = \@rows;
+  $self->{_dia_row_heights} = \@row_heights;
+  $self->{_dia_row_widths} = \@row_widths;
+  $self->{_dia_total_height} = $total_height;
+  $self->{_dia_total_width} = $total_width;
+  $self->{_dia_widest_row} = $widest_row;
+
+  #
+  # plot (relative) position of nodes (left to right, follow branch)
+  my $side;
+  my @toprow = sort {$nodes{$b}{weight} <=> $nodes{$a}{weight} } @{$rows[0]};
+  unshift (@toprow, pop(@toprow)) unless (scalar @toprow < 3);
+  my $increment = $widest_row / ( scalar @toprow + 1 );
+  my $pos = $increment;
+  my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 5 );
+  foreach my $node ( @toprow ) {
+    my $x = 0 - ( $self->{_dia_row_widths}[0] * $self->{_dia_widest_row} / 2)
+      + ($pos * $self->{_dia_row_widths}[0]);
+    $nodes{$node}{xx} = $x;
+    $nodes{$node}{yy} = $y;
+    $nodes{$node}{entity}->set_location($x,$y);
+    if (scalar @{$nodes{$node}{children}}) {
+      my @sorted_children = sort {
+	$nodes{$b}{weight} <=> $nodes{$a}{weight}
+      } @{$nodes{$node}{children}};
+      unshift (@sorted_children, pop(@sorted_children));
+      my $child_increment = $widest_row / (scalar @{$rows[1]});
+      my $childpos = $child_increment;
+      foreach my $child (@{$nodes{$node}{children}}) {
+	my $side;
+	if ($childpos <= ( $widest_row * 0.385 ) ) {
+	  $side = 'left';
+	} elsif ( $childpos <= ($widest_row * 0.615 ) ) {
+	  $side = 'center';
+	} else {
+	  $side = 'right';
+	}
+	plot_branch($self,$nodes{$child},$childpos,$side);
+	$childpos += $child_increment;
+      }
+    }
+    $nodes{$node}{pos} = $pos;
+
+#    warn "node ", $nodes{$node}{entity}->Name(), " : $pos xx : ", $nodes{$node}{xx} ," yy : ",$nodes{$node}{yy} ,"\n";
+
+    $pos += $increment;
+    $done{$node} = 1;
+  }
+
+  my @relationships = ();
+
+  if (ref $self->Dependancies)
+    { push(@relationships, @{$self->Dependancies}); }
+
+  if (ref $self->Inheritances)
+    { push(@relationships, @{$self->Inheritances}); }
+
+  foreach my $relationship (@relationships)
+    { $relationship->Reposition; }
+
+  return 1;
+}
+
+#
+## Functions used by _layout_dia_new method
+#
+
+# recursively calculate the depth of a node by following edges to its parents
+sub get_depth {
+  my ($node,$child,$nodes) = @_;
+  my $depth = 0;
+  $nodes->{$node}{weight}++;
+  if (exists $nodes->{$node}{depth}) {
+    $depth = $nodes->{$node}{depth} + 1;
+  } else {
+    my @parents = @{$nodes->{$node}{parents}};
+    if (scalar @parents > 0) {
+      foreach my $parent (@parents) {
+	my $newdepth = get_depth($parent,$node,$nodes);
+	$depth = $newdepth if ($depth < $newdepth);
+      }
+      $depth++;
+    } else {
+      $depth = 1;
+      $nodes->{$node}{depth} = 0;
+    }
+  }
+  return $depth;
+}
+
+# recursively plot the branches of a tree
+sub plot_branch {
+  my ($self,$node,$pos,$side) = @_;
+#  warn "plotting branch : ", $node->{entity}->Name," , $pos, $side\n";
+
+  my $depth = $node->{depth};
+  my $offset = 1;
+  my $h = 0;
+  while ( $h < $depth ) {
+#    warn "h : $h\n";
+    $offset += $self->{_dia_row_heights}[$h++] + 0.25;
+  }
+
+  my (@parents,@children) = ($node->{parents},$node->{children});
+  if ( $self->{_dia_done}{$node->{entity}->Id} && (scalar @children < 1) ) {
+    if (scalar @parents > 1 ) {
+      $self->{_dia_done}{$node}++;
+      my $sum = 0;
+      foreach my $parent (@parents) {
+	return 0 unless (exists $self->{_dia_nodes}{$parent->{entity}->Id}{pos});
+	$sum += $self->{_dia_nodes}{$parent->{entity}->Id}{pos};
+      }
+      $self->{_dia_positions}[$depth]{int($pos)} = 1;
+      my $newpos = ( $sum / scalar @parents );
+      unless (exists $self->{_dia_positions}[$depth]{int($newpos)}) {
+	# use wherever is free if position already taken
+	my $best_available = $pos;
+	my $diff = ($best_available > $newpos )
+	  ? $best_available - $newpos : $newpos - $best_available ;
+	foreach my $available (keys %{$self->{_dia_positions}[$depth]}) {
+	  my $newdiff = ($available > $newpos ) ? $available - $newpos : $newpos - $available ;
+	  if ($newdiff < $diff) {
+	    $best_available = $available;
+	    $diff = $newdiff;
 	  }
-	else
-	  { push (@orphan_classes,$class); }
+	}
+	$pos = $best_available;
+      } else {
+	$pos = $newpos;
       }
+    }
+    my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 4 ) + $offset;
+    my $x = 0 - ( $self->{_dia_row_widths}[$depth] * $self->{_dia_widest_row} / 2)
+      + ($pos * $self->{_dia_row_widths}[$depth]);
+#    my $x = 0 - ( $self->{_dia_widest_row} / 2) + ($pos * $self->{_dia_row_widths}[$depth]);
+    $node->{xx} = int($x);
+    $node->{yy} = int($y);
+    $node->{entity}->set_location($x,$y);
+    $node->{pos} = $pos;
+    delete $self->{_dia_positions}[$depth]{int($pos)};
+#    warn "node ", $node->{entity}->Name(), " : $pos xx : ", $node->{xx} ," yy : ",$node->{yy} ,"\n";
+    return 0;
+  } elsif ($self->{_dia_done}{$node}) {
+#    warn "node ", $node->{entity}->Name(), " : $node->{pos}\n";
+    return 0;
+  }
 
+  unless (exists $self->{_dia_positions}[$depth]{int($pos)}) {
+    my $best_available;
+    my $diff = $self->{_dia_widest_row} + 5;
+    foreach my $available (keys %{$self->{_dia_positions}[$depth]}) {
+      $best_available ||= $available;
+      my $newdiff = ($available > $pos ) ? $available - $pos : $pos - $available ;
+      if ($newdiff < $diff) {
+	$best_available = $available;
+	$diff = $newdiff;
+      }
+    }
+    $pos = $best_available;
+  }
+
+  delete $self->{_dia_positions}[$depth]{int($pos)};
+
+  my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 1 ) + $offset;
+  my $x = 0 - ( $self->{_dia_row_widths}[0] * $self->{_dia_widest_row} / 2)
+    + ($pos * $self->{_dia_row_widths}[0]);
+#  my $x = 0 - ( $self->{_dia_widest_row} / 2) + ($pos * $self->{_dia_row_widths}[$depth]);
+#  my $x = 0 - ( ( $pos * $self->{_dia_row_widths}[0] ) / 2);
+  $node->{xx} = int($x);
+  $node->{yy} = int($y);
+  $node->{entity}->set_location($x,$y);
+
+  $self->{_dia_done}{$node} = 1;
+  $node->{pos} = $pos;
+
+  if (scalar @{$node->{children}}) {
+    my @sorted_children = sort {
+      $self->{_dia_nodes}{$b}{weight} <=> $self->{_dia_nodes}{$a}{weight}
+    } @{$node->{children}};
+    unshift (@sorted_children, pop(@sorted_children));
+    my $child_increment = $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]});
+    my $childpos = 0;
+    if ( $side eq 'left' ) {
+      $childpos = 0
+    } elsif ( $side eq 'center' ) {
+      $childpos = $pos;
+    } else {
+      $childpos = $pos + $child_increment;
+    }
+    foreach my $child (@{$node->{children}}) {
+      $childpos += $child_increment if (plot_branch($self,$self->{_dia_nodes}{$child},$childpos,$side));
+    }
+  } elsif ( scalar @parents == 1 ) {
+      my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 1 ) + $offset;
+      my $x = 0 - ( $self->{_dia_row_widths}[0] * $self->{_dia_widest_row} / 2)
+	+ ($pos * $self->{_dia_row_widths}[0]);
+#      my $x = 0 - ( $self->{_dia_widest_row} / 2) + ($pos * $self->{_dia_row_widths}[$depth]);
+#      my $x = 0 - ( ( $pos * $self->{_dia_row_widths}[0] ) / 2);
+      $node->{xx} = int($x);
+      $node->{yy} = int($y);
+      $node->{entity}->set_location($x,$y);
+  }
+#  warn "node ", $node->{entity}->Name(), " : $pos xx : ", $node->{xx} ," yy : ",$node->{yy} ,"\n";
+  return 1;
+}
+
+#
+########################################
+#
+
+sub _layout {
+  my $self = shift;
+  my @columns;
+  my @orphan_classes;
+  my $column_count=0;
+
+  # populate a grid to be used for laying out the diagram.
+
+  # put each parent class in a column
+  my @parent_classes = $self->_get_parent_classes;
+  my %parent_class;
+  foreach my $class (@parent_classes) {
+    $parent_class{$class->Id} = $column_count;
+    if (defined $columns[$column_count][2][0]) {
+      push (@{$columns[$column_count][2]},$class);
+    } else {
+      $columns[$column_count][2][0] = $class;
+    }
     $column_count++;
+  }
 
-    foreach my $orphan (@orphan_classes)
-      { push (@{$columns[$column_count][3]}, $orphan); }
+  $column_count = 0;
 
-    # put components in columns with the most of their kids
-    if (ref $self->Components)
-      {
-	my @components = @{$self->Components};
-	foreach my $component (@components)
-	  {
-	    my $i =0;
-	    my $current_column = 0;
-	    my $current_children = 0;
-	    # find column with most children
+  my @childless_classes = $self->_get_childless_classes;
+  # put each child class in its parent column
+  foreach my $class (@childless_classes) {
+    if (defined $class->Inheritances) {
+      my ($inheritance) = $class->Inheritances;
+      my $parents_column = $parent_class{$inheritance->Parent} || 0;
+      push (@{$columns[$parents_column][3]},$class);
+    } else {
+      push (@orphan_classes,$class);
+    }
+  }
 
-	    my %child_ids = ();
-	    my @children = $component->Dependancies;
-	    foreach my $child (@children)
-	      { $child_ids{$child->Child} = 1; }
+  $column_count++;
 
-	    foreach my $column (@columns)
-	      {
-		if (ref $column)
-		  {
-		    my @column = @$column;
-		    next unless (defined $column);
-		    my $children = 0;
-		    foreach my $subcolumn (@column)
-		      {
-			foreach my $child (@$subcolumn)
-			  {
-			    if (defined $child_ids{$child->Id})
-			      { $children++; }
-			  }
-		      }
-		    if ($children > $current_children)
-		      { $current_column = $i; $current_children = $children; }
-		    $i++;
-		  }
-		else
-		  { print STDERR "Diagram.pm : _layout() : empty column .. skipping\n"; }
-	      }
-	    push(@{$columns[$current_column][0]},$component);
-	  }
+  foreach my $orphan (@orphan_classes) {
+    push (@{$columns[$column_count][3]}, $orphan);
+  }
+
+  # put components in columns with the most of their kids
+  if (ref $self->Components) {
+    my @components = @{$self->Components};
+    foreach my $component (@components) {
+      my $i =0;
+      my $current_column = 0;
+      my $current_children = 0;
+      # find column with most children
+
+      my %child_ids = ();
+      my @children = $component->Dependancies;
+      foreach my $child (@children) {
+	$child_ids{$child->Child} = 1;
       }
-    else { print STDERR "Diagram.pm : _layout() : no components / dependancies\n"; }
 
-    if (ref $self->Superclasses)
-      {
-	my @superclasses = @{$self->Superclasses};
-	# put superclasses in columns with most of their kids
-	foreach my $superclass (@superclasses)
-	  {
-	    my $i=0;
-	    my $current_column = 0;
-	    my $current_children = 0;
-	    # find column with most children
-
-	    my %child_ids = ();
-	    my @children = $superclass->Inheritances;
-	    foreach my $child (@children)
-	      { $child_ids{$child->Child} = 1; }
-
-	    foreach my $column (@columns)
-	      {
-		if (ref $column)
-		  {
-		    my @column = @$column;
-		    my $children = 0;
-		    foreach my $subcolumn (@column)
-		      {
-			foreach my $child (@$subcolumn)
-			  {
-			    if (defined $child_ids{$child->Id})
-			      { $children++; }
-			  }
-		      }
-		    if ($children > $current_children)
-		      { $current_column = $i; $current_children = $children; }
-		    $i++;
-		  }
-		else
-		  { print STDERR "Diagram.pm : _layout() : empty column .. skipping\n"; }
+      foreach my $column (@columns) {
+	if (ref $column) {
+	  my @column = @$column;
+	  next unless (defined $column);
+	  my $children = 0;
+	  foreach my $subcolumn (@column) {
+	    foreach my $child (@$subcolumn) {
+	      if (defined $child_ids{$child->Id}) {
+		$children++;
 	      }
-	    push(@{$columns[$current_column][1]},$superclass);
+	    }
 	  }
+	  if ($children > $current_children) {
+	    $current_column = $i; $current_children = $children;
+	  }
+	  $i++;
+	} else {
+	  print STDERR "Diagram.pm : _layout() : empty column .. skipping\n";
+	}
       }
-    else { print STDERR "Diagram.pm : _layout() : no superclasses / inheritances\n"; }
+      push(@{$columns[$current_column][0]},$component);
+    }
+  } else {
+    print STDERR "Diagram.pm : _layout() : no components / dependancies\n";
+  }
 
-    # grid now created - Components in top row, superclasses in second,
-    #  classes with subclasses in 3rd row, childless & orphan classes in 4th row.
+  if (ref $self->Superclasses) {
+    my @superclasses = @{$self->Superclasses};
+    # put superclasses in columns with most of their kids
+    foreach my $superclass (@superclasses) {
+      my $i=0;
+      my $current_column = 0;
+      my $current_children = 0;
+      # find column with most children
 
-    # now we position the contents of the grid.
-    my $next_row_y = 0;
+      my %child_ids = ();
+      my @children = $superclass->Inheritances;
+      foreach my $child (@children) {
+	$child_ids{$child->Child} = 1;
+      }
+
+      foreach my $column (@columns) {
+	if (ref $column) {
+	  my @column = @$column;
+	  my $children = 0;
+	  foreach my $subcolumn (@column) {
+	    foreach my $child (@$subcolumn) {
+	      if (defined $child_ids{$child->Id}) {
+		$children++;
+	      }
+	    }
+	  }
+	  if ($children > $current_children) {
+	    $current_column = $i; $current_children = $children;
+	  }
+	  $i++;
+	} else {
+	  print STDERR "Diagram.pm : _layout() : empty column .. skipping\n";
+	}
+      }
+      push(@{$columns[$current_column][1]},$superclass);
+    }
+  } else {
+    print STDERR "Diagram.pm : _layout() : no superclasses / inheritances\n";
+  }
+
+  # grid now created - Components in top row, superclasses in second,
+  #  classes with subclasses in 3rd row, childless & orphan classes in 4th row.
+
+  # now we position the contents of the grid.
+  my $next_row_y = 0;
     my $next_col_x = 0;
     my ($colspace, $rowspace) = (1.5 , 0.5);
 
-    foreach my $column (@columns)
-      {
-	my $x = $next_col_x;
-	foreach my $subcolumn (@$column)
-	  {
-	    my $count = 0;
-	    my $y = $next_row_y;
+  foreach my $column (@columns) {
+    my $x = $next_col_x;
+    foreach my $subcolumn (@$column) {
+      my $count = 0;
+      my $y = $next_row_y;
 	    $next_row_y += 3;
 	    foreach my $entity (@$subcolumn)
 	      {
 		my $next_xy = $entity->set_location($x,$y);
-		($x,$y) = @$next_xy;
-		$x-=3;
-		$y-=(2+($entity->Height/5));
-		if ($count >= 4)
-		  {
-		    $next_row_y = 0;
+      ($x,$y) = @$next_xy;
+      $x-=3;
+      $y-=(2+($entity->Height/5));
+      if ($count >= 4) {
+	$next_row_y = 0;
 		    $y = 0;
 		    $x += $colspace;
-		    $count = 0;
-		  }
-		$count++;
-	      }
-	    $y += $rowspace;
-	  }
-	$x += $colspace;
-	$next_col_x = $x;
+	$count = 0;
       }
+      $count++;
+    }
+    $y += $rowspace;
+  }
+  $x += $colspace;
+  $next_col_x = $x;
+}
 
-    my @relationships = ();
+my @relationships = ();
 
     if (ref $self->Dependancies)
       {	push(@relationships, @{$self->Dependancies}); }

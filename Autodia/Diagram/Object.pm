@@ -67,8 +67,8 @@ sub BottomRightPos
      $self->{"top_y"}  ||= 1;
      $self->{"height"} ||= 1;
 
-    my $x = sprintf("%.3f",$self->{"width"}) + sprintf("%.3f",$self->{"left_x"});
-    my $y = sprintf("%.3f",$self->{"top_y"}) + sprintf("%.3f",$self->{"height"});
+    my $x = sprintf("%.3f",$self->{"width"} + $self->{"left_x"});
+    my $y = sprintf("%.3f",$self->{"top_y"} + $self->{"height"});
 
     return "$x,$y";
 }

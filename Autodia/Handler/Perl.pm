@@ -41,6 +41,8 @@ sub _parse {
   my $filename = shift;
   my $Diagram  = $self->{Diagram};
 
+  my $pkg_regexp = qr([\w:]+);
+
   my $Class;
 
   $self->{pod} = 0;
@@ -53,7 +55,7 @@ sub _parse {
     }
 
     # if line contains package name then parse for class name
-    if ($line =~ /^\s*package\s+([A-Za-z0-9\:]+)/) {
+    if ($line =~ /^\s*package\s+($pkg_regexp)/) {
       my $className = $1;
       # create new class with name
       $Class = Autodia::Diagram::Class->new($className);
@@ -61,7 +63,7 @@ sub _parse {
       $Diagram->add_class($Class);
     }
 
-    if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\((.*)\)/) {
+    if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\s*[\(\{\/\#]\s*(.*)\s*[\(\{\/\#]/) {
       my $superclass = $1;
 
       # check package exists before doing stuff
@@ -94,7 +96,7 @@ sub _parse {
     }
 
     # if line contains dependancy name then parse for module name
-    if ($line =~ /^\s*(use|require)\s+([A-Za-z0-9\:]+)/) {
+    if ($line =~ /^\s*(use|require)\s+($pkg_regexp)/) {
       my $componentName = $2;
 
       # discard if stopword

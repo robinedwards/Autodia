@@ -119,13 +119,15 @@ BENCHMARKS
 Some quick and dirty tests to give you an idea of how long stuff could
 take.
 
-On a K2 450, running Linux 2.2.12. AutoDial analysed itself 10 times,
-Autodial pre 0.05 contains about 2000 lines of code in 7 files. AutoDia 0.05 and higher
-contains about 2500 to 3000 lines in 11 files
+Autodia pre 0.05 contains about 2000 lines of code in 7 files. 
+Autodia 0.05 and higher contains about 2500 to 3000 lines in 11 files.
+Autodia 1.7 (pre-release) contains a total of 5520 lines in 18 files excluding makefiles, etc
 
 version 1.0: (intel Celeron Mendocino 466mhz running linux 2.4.6)
 10 loops of autodial.pl took  9 wallclock secs ( 8.87 usr +  0.02 sys = 
 8.89 CPU) @  1.12/s (n=10)
+
+On a K2 450, running Linux 2.2.12. AutoDial analysed itself 10 times,
 
 version 0.09:
 10 loops of autodial.pl took 10 wallclock secs ( 9.20 usr +  0.24 sys =  

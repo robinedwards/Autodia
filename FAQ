@@ -42,11 +42,6 @@ A: Because it is so much easier in perl. Perl is good for parsing text and
 also interfaces very well with databases and other sources of data making
 it the prime choice of language for this task.
 
-Q: Why isn't this in CPAN?
-A: Because its more of an application than a module, although about 90% of
-the code/work is in a group of modules called by the main script, so if
-enough people ask I'll put it there for general use.
-
 Q: Why don't you do this for Visio
 A: i) Because Visio *STILL* uses proprietary formats and requires lots of
 NDAs and license fees to be able to integrate with.

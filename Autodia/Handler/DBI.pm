@@ -45,6 +45,10 @@ sub _parse_file { # parses dbi-connection string
   # new dbi connection
   my $dbh = DBI->connect("DBI:$filename", $config{username}, $config{password});
 
+  my $escape_tablenames = 0;
+  my $database_type =  $self->get_dbh->get_info( 17 );
+  $escape_tablenames = 1 if (lc($database_type) =~ m/(oracle|postgres)/);
+
   # process tables
   my %table = map { $_ => 1 } $dbh->tables();
   foreach my $table (keys %table) {
@@ -54,11 +58,13 @@ sub _parse_file { # parses dbi-connection string
     $self->{Diagram}->add_class($Class);
 
     # get fields
-    my $sth = $dbh->prepare("select * from $table where 1 = 0");
+    my $esc_table = $table;
+    $esc_table = qq{"$esc_table"} if ($escape_tablenames);
+
+    my $sth = $dbh->prepare("select * from $esc_table where 1 = 0");
     $sth->execute;
     my @fields = @{ $sth->{NAME} };
     $sth->finish;
-
 
     for my $field (@fields) {
       $Class->add_attribute({

@@ -27,3 +27,5 @@ Autodia/Handler/PHP.pm
 Autodia/Handler/DBI.pm
 Autodia/Handler/SQL.pm
 Autodia/Handler/dia.pm
+Autodia/Handler/Torque.pm
+Autodia/Handler/python.pm
