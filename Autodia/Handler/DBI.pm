@@ -11,6 +11,9 @@ require Exporter;
 
 use strict;
 
+use warnings;
+use warnings::register;
+
 use vars qw($VERSION @ISA @EXPORT);
 use Autodia::Handler;
 
@@ -38,6 +41,7 @@ use DBI;
 # _initialise inherited from Autodia::Handler
 
 sub _parse_file { # parses dbi-connection string
+  print "DBI.pm - parsing file\n";
   my $self     = shift();
   my $filename = shift();
   my %config   = %{$self->{Config}};
@@ -46,11 +50,17 @@ sub _parse_file { # parses dbi-connection string
   my $dbh = DBI->connect("DBI:$filename", $config{username}, $config{password});
 
   my $escape_tablenames = 0;
-  my $database_type =  $self->get_dbh->get_info( 17 );
+  my $database_type =  $dbh->get_info( 17 );
+
+  print "database type : $database_type\n";
+
   $escape_tablenames = 1 if (lc($database_type) =~ m/(oracle|postgres)/);
 
   # process tables
   my %table = map { $_ => 1 } $dbh->tables();
+
+  warn Dumper(%table);
+
   foreach my $table (keys %table) {
     # create new 'class' representing table
     my $Class = Autodia::Diagram::Class->new($table);

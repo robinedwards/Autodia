@@ -60,7 +60,7 @@ sub _parse {
       # create new class with name
       $Class = Autodia::Diagram::Class->new($className);
       # add class to diagram
-      $Diagram->add_class($Class);
+      $Class = $Diagram->add_class($Class);
     }
 
     if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\s*([\(\{\/\#])\s*(.*)\s*[\)\}\1]/) {
@@ -69,7 +69,7 @@ sub _parse {
       # check package exists before doing stuff
       $self->_is_package(\$Class, $filename);
 
-      my @superclasses = split(/\s*,?\s*/, $superclass);
+      my @superclasses = split(/[\s*,]/, $superclass);
 
       foreach my $super (@superclasses) # WHILE_SUPERCLASSES
 	{
@@ -80,6 +80,7 @@ sub _parse {
 	  # add superclass to diagram
 
 	  my $exists_already = $Diagram->add_superclass($Superclass);
+#	  warn "already exists ? $exists_already \n";
 	  if (ref $exists_already) {
 	    $Superclass = $exists_already;
 	  }
@@ -105,13 +106,14 @@ sub _parse {
       # check package exists before doing stuff
       $self->_is_package(\$Class, $filename);
 
-      if ($componentName eq 'fields') {
 
+      if ($componentName =~ /(fields|private|public)/) {
+	my $pragma = $1;
 	$line =~ /\sqw\((.*)\)/;
 	my @fields = split(/\s+/,$1);
 	foreach my $field (@fields) {
 	  my $attribute_visibility = ( $field =~ m/^\_/ ) ? 1 : 0;
-
+          unless ($pragma eq 'fields') { $attribute_visibility = ($pragma eq 'private' ) ? 1 : 0; }
 	  $Class->add_attribute({
 				 name => $field,
 				 visibility => $attribute_visibility,
@@ -142,33 +144,39 @@ sub _parse {
     # if ISA in line then extract templates/superclasses
     if ($line =~ /^\s*\@(?:\w+\:\:)*ISA\s*\=\s*(?:q|qw){0,1}\((.*)\)/) {
       my $superclass = $1;
+      
+#      warn "handling superclasses $1 with \@ISA\n";
+#      warn "superclass line : $line \n";
+      if ($superclass) {
+	  # check package exists before doing stuff
+	  $self->_is_package(\$Class, $filename);
 
-      # check package exists before doing stuff
-      $self->_is_package(\$Class, $filename);
+	  my @superclasses = split(" ", $superclass);
 
-      my @superclasses = split(" ", $superclass);
-
-      foreach my $super (@superclasses) # WHILE_SUPERCLASSES
-	{
-	  # discard if stopword
-	  next if ($super =~ /(?:exporter|autoloader)/i);
-	  # create superclass
-	  my $Superclass = Autodia::Diagram::Superclass->new($super);
-	  # add superclass to diagram
-	  my $exists_already = $Diagram->add_superclass($Superclass);
-	  if (ref $exists_already) {
-	    $Superclass = $exists_already;
+	  foreach my $super (@superclasses) # WHILE_SUPERCLASSES
+	  {
+	      # discard if stopword
+	      next if ($super =~ /(?:exporter|autoloader)/i || !$super);
+	      # create superclass
+	      my $Superclass = Autodia::Diagram::Superclass->new($super);
+	      # add superclass to diagram
+	      my $exists_already = $Diagram->add_superclass($Superclass);
+#	      warn "already exists ? $exists_already \n";
+	      if (ref $exists_already) {
+		  $Superclass = $exists_already;
+	      }
+	      # create new inheritance
+#	      warn "creating inheritance from superclass : $super\n";
+	      my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+	      # add inheritance to superclass
+	      $Superclass->add_inheritance($Inheritance);
+	      # add inheritance to class
+	      $Class->add_inheritance($Inheritance);
+	      # add inheritance to diagram
+	      $Diagram->add_inheritance($Inheritance);
 	  }
-	  # create new inheritance
-	  my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
-	  # add inheritance to superclass
-	  $Superclass->add_inheritance($Inheritance);
-	  # add inheritance to class
-	  $Class->add_inheritance($Inheritance);
-	  # add inheritance to diagram
-	  $Diagram->add_inheritance($Inheritance);
-	}
-    }
+      } else { warn "ignoring empty \@ISA \n"; }
+  }
 
     # if line contains sub then parse for method data
     if ($line =~ /^\s*sub\s+?(\w+)/) {

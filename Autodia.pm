@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.8";
+        $VERSION = "1.9";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -70,9 +70,9 @@ sub getPattern
 	     );
 
   my %cpp  = (
-	      regex     => '\w+\.(c|cpp|h)$',
+	      regex     => '\w+\.(c|cpp|hh?)$',
 	      wildcards => [
-			    "c", "cpp", "h",
+			    "c", "cpp", "h","hh"
 			   ],
 	     );
 

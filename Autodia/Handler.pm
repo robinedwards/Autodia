@@ -62,18 +62,23 @@ sub output
 
     $Diagram->remove_duplicates;
 
-    #process template
+    # export output
+    my $success;
     if ($config{graphviz}) {
       $self->{Config}{outputfile} = "$alternative_filename.png" if ($config{singlefile});
-      $Diagram->export_graphviz(\%config);
+      $success = $Diagram->export_graphviz(\%config);
     } elsif ($config{vcg}) {
       $self->{Config}{outputfile} = "$alternative_filename.ps" if ($config{singlefile});
-      $Diagram->export_vcg(\%config);
+      $success = $Diagram->export_vcg(\%config);
     } else {
       $self->{Config}{outputfile} = "$alternative_filename.xml" if ($config{singlefile});
-      $Diagram->export_xml(\%config);
+      $success = $Diagram->export_xml(\%config);
     }
-    warn "written outfile : $config{outputfile}\n";
+    if ($success) {
+	warn "written outfile : $config{outputfile} successfully \n";
+    } else {
+	warn "nothing to output using $config{language} handler - are you sure you set the language correctly ?\n";
+    }
     return 1;
   }
 

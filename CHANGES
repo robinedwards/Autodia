@@ -1,6 +1,14 @@
 Changes to AutoDia
 ------------------
 
+version 1.9 10/12/2003
+- added support for 'use public' and 'use private' in Perl Handler (experimental)
+- fixed bug in DBI handler (thanks to the two people who pointed out the schoolboy error)
+- added check for empty diagrams ( handy, should also fix some errors)
+- fixed bug in Perl Handler where use base splits package names too enthusiasticly
+- fixed bug in Perl Handler, can now parse modules like XML:Xerces (go on try it!)
+- fixed several small bugs in Diagram class
+
 version 1.8 29/08/2003
 - added -C 'skip CVS directory(s)' option
 - added -F 'single file per diagram' option
@@ -24,7 +32,6 @@ version 1.7 13/07/2003
 version 1.6 30/03/2003
 - fixed SQL handler
 - improved test suite
-
 
 version 1.5 28/03/2003
 - fixes to DBI handler 

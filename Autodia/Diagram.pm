@@ -12,6 +12,8 @@ use strict;
 use Template;
 use Data::Dumper;
 
+$Data::Dumper::Maxdepth = 2;
+
 use Autodia::Diagram::Class;
 use Autodia::Diagram::Component;
 use Autodia::Diagram::Superclass;
@@ -142,7 +144,8 @@ sub add_class
       {
 	print STDERR "Diagram.pm : add_class : ignoring duplicate class",
 	  $class->Name, "\n";
-	return -1;
+#	warn Dumper (original_class=>$self->{"packages"}{"class"}{$class->Name});
+	return $self->{"packages"}{"class"}{$class->Name};
       }
     # note : when running benchmark.pl this seems to appear which I guess is a
     # scoping issue when calling autodial multiple times - odd, beware if using
@@ -151,7 +154,7 @@ sub add_class
     $class->Set_Id($self->_object_count);
     $self->_package_add($class);
 
-    return 1;
+    return $class;
 }
 
 sub remove_duplicates
@@ -394,6 +397,8 @@ sub export_graphviz
 	$g->add_node($node,shape=>'record');
 
       }
+    } else {
+      return 0;
     }
 
     my $superclasses = $self->Superclasses;
@@ -404,7 +409,7 @@ sub export_graphviz
 	my $node = $Superclass->Name;
 	$node=~ s/[\{\}]//g;
 	$node = '{'.$node."|\n}";
-	warn "node : $node\n";
+#	warn "node : $node\n";
 	$nodes{$Superclass->Id} = $node;
 	$g->add_node($node,shape=>'record');
       }
@@ -426,7 +431,7 @@ sub export_graphviz
       foreach my $Component (@$components) {
 #	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
 	my $node = '{'.$Component->Name.'}';
-	warn "node : $node\n";
+#	warn "node : $node\n";
 	$nodes{$Component->Id} = $node;
 	$g->add_node($node, shape=>'record');
       }
@@ -449,7 +454,7 @@ sub export_graphviz
 
     close FILE;
 
-    return;
+    return 1;
   }
 
 
@@ -514,13 +519,15 @@ sub export_vcg {
       $vcg->add_node(label=>$node, title=>$node);
 
     }
+  } else {
+    return 0;
   }
 
   my $superclasses = $self->Superclasses;
 
   if (ref $superclasses) {
     foreach my $Superclass (@$superclasses) {
-      warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
+#      warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
       my $node = $Superclass->Name()."\n----------------\n";
       $nodes{$Superclass->Id} = $node;
       $vcg->add_node(title=>$node, label=> $node);
@@ -563,7 +570,7 @@ sub export_vcg {
 
   close FILE;
 
-  return;
+  return 1;
 }
 
 
@@ -583,8 +590,8 @@ sub export_xml
     if ($config{no_deps})
       { $self->_no_deps; }
 
-    $self->_layout_dia_new; # calculate positions of the elements using new method
-#    $self->_layout;     # calculate the positions of the elements within diagram
+    my $success = $self->_layout_dia_new;
+    return 0 unless $success;
 
     if (ref $self->Classes) {
       foreach my $Class ( @{$self->Classes} ) {
@@ -630,7 +637,7 @@ sub export_xml
 	|| die $template->error();
 
     print "\n\noutput file is : $output_filename\n" unless ( $config{silent} );
-    return;
+    return 1;
 }
 
 #---------------------------------------------------------------------------------
@@ -778,6 +785,8 @@ sub _sort
   }
 
 
+# now returns 0 if no classes found
+
 sub _layout_dia_new {
   my $self = shift;
   my %config = %{$self->{_config}};
@@ -804,6 +813,7 @@ sub _layout_dia_new {
 	  $height += (scalar @$attributes * 3.2);
 	}
       }
+#      warn "creating node for class : ", $Class->Id, "\n";
       $nodes{$Class->Id} = {parents=>[], weight=>0, center=>[], height=>$height,
 			    children=>[], entity=>$Class, width=>$width};
     }
@@ -813,7 +823,8 @@ sub _layout_dia_new {
   if (ref $superclasses) {
     foreach my $Superclass (@$superclasses) {
       my $width = 3 + ( (length ($Superclass->Name) - 3) * 0.75 );
-      $nodes{$Superclass->Id} = {parents=>[], weight=>0, center=>[], height=>18,
+#      warn "creating node for class : ", $Superclass->Id, "\n";
+      $nodes{$Superclass->Id} = {parents=>[], weight=>0, center=>[], height=>15,
 				 children=>[], entity=>$Superclass, width=>$width};
     }
   }
@@ -821,8 +832,9 @@ sub _layout_dia_new {
   my $components = $self->Components;
   if (ref $components) {
     foreach my $Component (@$components) {
+#      warn "creating node for class : ", $Component->Id, "\n";
       my $width = 3 + ( (length ($Component->Name) - 3) * 0.55 );
-      $nodes{$Component->Id} = {parents=>[], weight=>0, center=>[], height=>18,
+      $nodes{$Component->Id} = {parents=>[], weight=>0, center=>[], height=>15,
 				children=>[], entity=>$Component, width=>$width};
     }
   }
@@ -843,6 +855,7 @@ sub _layout_dia_new {
 
   # first pass (build network of edges to and from each node)
   foreach my $edge (@edges) {
+#    warn Dumper (edge=>$edge) unless ($edge->{from} && $edge->{to});
     my ($from,$to) = ($edge->{from},$edge->{to});
     push(@{$nodes{$to}{parents}},$from);
     push(@{$nodes{$from}{children}},$to);
@@ -869,12 +882,17 @@ sub _layout_dia_new {
     my $tallest_node_height = 0;
     my $widest_node_width = 0;
     $widest_row = scalar @$row if ( scalar @$row > $widest_row );
+    my @newrow = ();
     foreach my $node (@$row) {
+#      warn Dumper(node=>$node);
+      unless (defined $node && defined $nodes{$node}) { warn "warning : empty class/package encountered, skipping"; Dumper(empty_node=>$nodes{$node}); next;}
       $tallest_node_height = $nodes{$node}{height} 
 	if ($nodes{$node}{height} > $tallest_node_height);
       $widest_node_width = $nodes{$node}{width}
 	if ($nodes{$node}{width} > $widest_node_width);
+      push (@newrow,$node);
     }
+    $row = \@newrow;
     $row_heights[$i] = $tallest_node_height + 0.5;
     $row_widths[$i] = $widest_node_width;
     $total_height += $tallest_node_height + 0.5 ;
@@ -904,6 +922,7 @@ sub _layout_dia_new {
   #
   # plot (relative) position of nodes (left to right, follow branch)
   my $side;
+  return 0 unless (ref $rows[0]);
   my @toprow = sort {$nodes{$b}{weight} <=> $nodes{$a}{weight} } @{$rows[0]};
   unshift (@toprow, pop(@toprow)) unless (scalar @toprow < 3);
   my $increment = $widest_row / ( scalar @toprow + 1 );
@@ -922,7 +941,8 @@ sub _layout_dia_new {
       unshift (@sorted_children, pop(@sorted_children));
       my $child_increment = $widest_row / (scalar @{$rows[1]});
       my $childpos = $child_increment;
-      foreach my $child (@{$nodes{$node}{children}}) {
+#      foreach my $child (@{$nodes{$node}{children}}) {
+      foreach my $child (@sorted_children) {
 	my $side;
 	if ($childpos <= ( $widest_row * 0.385 ) ) {
 	  $side = 'left';
@@ -989,13 +1009,13 @@ sub plot_branch {
 #  warn "plotting branch : ", $node->{entity}->Name," , $pos, $side\n";
 
   my $depth = $node->{depth};
-  my $offset = 1;
+  my $offset = 0.8;
   my $h = 0;
   while ( $h < $depth ) {
-#    warn "h : $h\n";
-    $offset += $self->{_dia_row_heights}[$h++] + 0.25;
+    $offset += $self->{_dia_row_heights}[$h++] + 0.1;
   }
 
+#  warn Dumper(node=>$node);
   my (@parents,@children) = ($node->{parents},$node->{children});
   if ( $self->{_dia_done}{$node->{entity}->Id} && (scalar @children < 1) ) {
     if (scalar @parents > 1 ) {
@@ -1025,6 +1045,7 @@ sub plot_branch {
       }
     }
     my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 4 ) + $offset;
+    print "y : $y\n";
     my $x = 0 - ( $self->{_dia_row_widths}[$depth] * $self->{_dia_widest_row} / 2)
       + ($pos * $self->{_dia_row_widths}[$depth]);
 #    my $x = 0 - ( $self->{_dia_widest_row} / 2) + ($pos * $self->{_dia_row_widths}[$depth]);
@@ -1073,7 +1094,7 @@ sub plot_branch {
       $self->{_dia_nodes}{$b}{weight} <=> $self->{_dia_nodes}{$a}{weight}
     } @{$node->{children}};
     unshift (@sorted_children, pop(@sorted_children));
-    my $child_increment = $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]});
+    my $child_increment = (scalar @{$self->{_dia_rows}[$depth + 1]}) ? $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]}): 0 ;
     my $childpos = 0;
     if ( $side eq 'left' ) {
       $childpos = 0
