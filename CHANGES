@@ -1,6 +1,16 @@
 Changes to AutoDia
 ------------------
 
+version 1.8 29/08/2003
+- added -C 'skip CVS directory(s)' option
+- added -F 'single file per diagram' option
+- added support for filenames containing spaces in -i option
+- fix in Autodia.pm wildcard/regex's provided by Daping Wang <dapingwang@lucent.com>
+- fix in SQL handler provided by Brian Koehmstedt <bpk@hungry.com>
+- fix in C++ handler that stops "public foo" class being created in place of "foo"
+- another 'use base' fix in Perl handler
+- fix to new layout that stops infinite loops (hopefully)
+
 version 1.7 13/07/2003
 - added Torque handler
 - added Python handler (experimental)

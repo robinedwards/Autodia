@@ -43,15 +43,20 @@ sub process {
   foreach my $filename (@{$config{filenames}}) {
     my $current_file = $config{inputpath} . $filename;
     print "opening $current_file\n" unless ( $config{silent} );
+    $self->_reset() if ($config{singlefile});
     $self->_parse_file($current_file)
       or warn "no such file - $current_file \n";
+    $self->output($current_file) if ($config{singlefile});
   }
 }
 
 sub output
   {
     my $self    = shift;
+    my $alternative_filename = shift;
     my $Diagram = $self->{Diagram};
+
+    if (defined $alternative_filename ) { $alternative_filename =~ s|\/|--|g; }
 
     my %config = %{$self->{Config}};
 
@@ -59,12 +64,16 @@ sub output
 
     #process template
     if ($config{graphviz}) {
+      $self->{Config}{outputfile} = "$alternative_filename.png" if ($config{singlefile});
       $Diagram->export_graphviz(\%config);
     } elsif ($config{vcg}) {
+      $self->{Config}{outputfile} = "$alternative_filename.ps" if ($config{singlefile});
       $Diagram->export_vcg(\%config);
     } else {
+      $self->{Config}{outputfile} = "$alternative_filename.xml" if ($config{singlefile});
       $Diagram->export_xml(\%config);
     }
+    warn "written outfile : $config{outputfile}\n";
     return 1;
   }
 
@@ -80,6 +89,14 @@ sub _initialise
   $self->{Config}  = $config_ref || ();
   $self->{Diagram} = $Diagram;
 
+  return 1;
+}
+
+sub _reset {
+  my $self = shift;
+  my $config_ref = $self->{Config};
+  my $Diagram = Autodia::Diagram->new($config_ref);
+  $self->{Diagram} = $Diagram;
   return 1;
 }
 

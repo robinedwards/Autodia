@@ -780,13 +780,13 @@ sub _sort
 
 sub _layout_dia_new {
   my $self = shift;
-  my %config          = %{$self->{_config}};
+  my %config = %{$self->{_config}};
   # build table of nodes and relationships
-  my %nodes;
-  my @edges;
-  my @rows;
-  my @row_heights;
-  my @row_widths;
+  my %nodes = ();
+  my @edges = ();
+  my @rows  = ();
+  my @row_heights = ();
+  my @row_widths = ();
   # - add classes nodes
   my $classes = $self->Classes;
   if (ref $classes) {
@@ -859,12 +859,13 @@ sub _layout_dia_new {
     push(@{$rows[$depth]},$node)
   }
 
-  # calculate height and width of diagram in descrete steps
+  # calculate height and width of diagram in discrete steps
   my $i = 0;
   my $widest_row = 0;
   my $total_height = 0;
   my $total_width = 0;
   foreach my $row (@rows) {
+    unless (ref $row) { $row = []; next }
     my $tallest_node_height = 0;
     my $widest_node_width = 0;
     $widest_row = scalar @$row if ( scalar @$row > $widest_row );
@@ -914,7 +915,7 @@ sub _layout_dia_new {
     $nodes{$node}{xx} = $x;
     $nodes{$node}{yy} = $y;
     $nodes{$node}{entity}->set_location($x,$y);
-    if (scalar @{$nodes{$node}{children}}) {
+    if (scalar @{$nodes{$node}{children}} && ( scalar @{$rows[1]} > 0)) {
       my @sorted_children = sort {
 	$nodes{$b}{weight} <=> $nodes{$a}{weight}
       } @{$nodes{$node}{children}};
@@ -935,8 +936,6 @@ sub _layout_dia_new {
       }
     }
     $nodes{$node}{pos} = $pos;
-
-#    warn "node ", $nodes{$node}{entity}->Name(), " : $pos xx : ", $nodes{$node}{xx} ," yy : ",$nodes{$node}{yy} ,"\n";
 
     $pos += $increment;
     $done{$node} = 1;
@@ -968,6 +967,7 @@ sub get_depth {
   if (exists $nodes->{$node}{depth}) {
     $depth = $nodes->{$node}{depth} + 1;
   } else {
+    $nodes->{$node}{depth} = 1;
     my @parents = @{$nodes->{$node}{parents}};
     if (scalar @parents > 0) {
       foreach my $parent (@parents) {

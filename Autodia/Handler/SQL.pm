@@ -72,7 +72,7 @@ sub _parse {
       foreach my $type (keys %data_types) {
 	my $pattern = join('|', ($type,@{$data_types{$type}}));
 	print "checking line : $fileline against pattern : $pattern\n";
-	if ($fileline =~ /\s*(\S+)\s+($pattern)\s*([\w\s\(\)]*),\s*/i) {
+	if ($fileline =~ /\s*(\S+)\s+($pattern)\s*([\w\s\(\)]*),?\s*/i) {
 	  print "matched field \n";
 	  $matched = 1;
 	  my ($field,$field_type,$extra_info) = ($1,$2,$3);

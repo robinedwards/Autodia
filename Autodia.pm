@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.7";
+        $VERSION = "1.8";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -70,14 +70,14 @@ sub getPattern
 	     );
 
   my %cpp  = (
-	      regex     => '\w+\.[c|cpp|h]$',
+	      regex     => '\w+\.(c|cpp|h)$',
 	      wildcards => [
 			    "c", "cpp", "h",
 			   ],
 	     );
 
    my %java = (
-	       regex     => '\w+\.[java|class]$',
+	       regex     => '\w+\.(java|class)$',
 	       wildcards => [
 			      "java", "class",
 			    ],

@@ -18,7 +18,7 @@ an interactive manner, and is a single user application for use from the
 console.
 
 AutoDia has been previously known as autodial. The output file is still 
-called autodial.out.xml by default. The executable files are now called
+called autodia.out.xml by default. The executable files are now called
 autodia.pl and autodia_java.pl, the only difference being an additional
 section near the start of the latter to enable INLINE::Java.
 
@@ -37,9 +37,9 @@ inherits from Handler, as Autodia::Handler::Perl does - the perl handler is
 a good example and best documented - the C++ and PHP handlers can also be helpful
 when writing a new handler.
 
-I feel that AutoDia does a reasonable job most of the time. I would be reluctant
-to call it gold or gamma, as it can still be thrown by awkward code, but such
-is the way of things in this area.
+I feel that AutoDia does a reasonable job most of the time. There is very little
+chance of it damaging any files although generated output may crash applications
+if files are corrupted or contain errors.
 
 COPYRIGHT AND LICENSE
 ---------------------
@@ -50,25 +50,19 @@ Licensed under the GNU General Public License (GPL, see file COPYING).
 CONTACT
 -------
 
-Please use the mailing list for discussion of the application, bug
-reports, feature requests and fixes or suggestions. There are plenty of
-people on the list (hopefully) who know as much or more than me on most
-relevent subjects.
-
-If you've read the FAQ, the docs below and the mailing lists archive and
-list isn't the right place to ask then you can mail me at ajt@droogs.org,
-and put "[AutoDia]" in the subject line. 
+email me at ajt@droogs.org, and put "[AutoDia]" in the subject line. 
 
 DOCUMENTATION
 -------------
 
 README   : this file.
+COPYING  : The GPL License allowing your use and distribution of this code
 INSTALL  : installation guide.
 UPGRADE  : instructions for upgrading older installations.
 CHANGES  : list of changes, new features and bugfixes.
 FIXES    : list of bugfixes (in stable releases only).
 FAQ      : questions and answers for admins.
-DEVELOP  : info for people who want to extend or customize AutoDIAL.
+DEVELOP  : info for people who want to extend or customize AutoDia
 BUGS     : bugs and caveats not yet fixed
 
 CONTRIBUTING

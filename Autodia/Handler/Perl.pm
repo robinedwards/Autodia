@@ -63,13 +63,13 @@ sub _parse {
       $Diagram->add_class($Class);
     }
 
-    if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\s*[\(\{\/\#]\s*(.*)\s*[\(\{\/\#]/) {
-      my $superclass = $1;
+    if ($line =~ /^\s*use\s+base\s+(?:q|qw){0,1}\s*([\(\{\/\#])\s*(.*)\s*[\)\}\1]/) {
+      my $superclass = $2;
 
       # check package exists before doing stuff
       $self->_is_package(\$Class, $filename);
 
-      my @superclasses = split(" ", $superclass);
+      my @superclasses = split(/\s*,?\s*/, $superclass);
 
       foreach my $super (@superclasses) # WHILE_SUPERCLASSES
 	{

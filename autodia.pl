@@ -18,7 +18,7 @@ use Autodia;
 
 # get configuration from command line
 my %args=();
-getopts("sSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
+getopts("FCsSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
 my %config = %{get_config(\@ARGV,\%args)};
 
 print "\n\nAutoDia - version ".$Autodia::VERSION."(c) Copyright 2003 A Trevena\n\n" unless ( $config{silent} );
@@ -50,7 +50,7 @@ else
 
 $handler->process();
 
-$handler->output();
+$handler->output() unless ($config{singlefile});
 
 print "complete. (processed ", scalar(@{$config{filenames}}), " files)\n\n" unless ( $config{silent} );
 
@@ -85,6 +85,9 @@ sub get_config
     $config{graphvizdia} = (defined $args{'Z'}) ? 1 : 0;
     $config{vcg} = (defined $args{'v'}) ? 1 : 0;
 
+    $config{singlefile} = (defined $args{'F'}) ? 1 : 0;
+    $config{skipcvs} = (defined $args{'C'}) ? 1 : 0;
+
     $config{username} = (defined $args{'U'}) ? $args{'U'} : "root";
     $config{password} = (defined $args{'P'}) ? $args{'P'} : "";
 
@@ -104,69 +107,90 @@ sub get_config
 
     my %file_extensions = %{Autodia->getPattern()};
 
-    if (defined $args{'i'})
-      { @filenames = split(" ",$args{'i'}); }
-    elsif (defined $args{'d'})
-      {
-	print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
-	my @dirs = split(" ",$args{'d'});
-	if (defined $args{'r'})
-	  {
-	    print "recursively searching files..\n" unless ( $config{silent} );
-	    find ( sub
-		   {
-		     unless (-d)
-		       {
-			 my $regex = $file_extensions{regex};
-			 push @filenames, $File::Find::name
-			   if ($File::Find::name =~ m/$regex/);
-		       }
-		   } , @dirs );
+    if (defined $args{'i'}) {
+      my $last;
+      foreach my $filename ( split(" ",$args{'i'}) ) {
+	unless ( -f $filename ) {
+	  if ($last) {
+	    $filename = "$last $filename";
+	    unless (-f $filename) {
+	      warn "cannot find $filename .. ignoring\n";
+	      $last = $filename;
+	      next;
+	    }
+	  } else {
+	    $last = $filename;
+	    warn "cannot find $filename .. ignoring\n";
+	    next;
 	  }
-	else
-	  {
-	    my @wildcards = @{$file_extensions{wildcards}};
-	    print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
-	    foreach my $directory (@dirs)
-	      {
-		print "searching $directory\n" unless ( $config{silent} );
-		$directory =~ s|(.*)\/$|$1|;
-		foreach my $wildcard (@wildcards)
-		  {
-		    print "$wildcard" unless ( $config{silent} );
-		    print " .. " , <$directory/*.$wildcard>, " \n";
-		    push @filenames, <$directory/*.$wildcard>;
-		  }
-	      }
+	}
+	undef $last;
+	push(@filenames,$filename);
+      }
+    } elsif (defined $args{'d'}) {
+      print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
+      my @dirs = split(" ",$args{'d'});
+      if (defined $args{'r'}) {
+	print "recursively searching files..\n" unless ( $config{silent} );
+	find ( { wanted => sub {
+		   unless (-d) {
+		     my $regex = $file_extensions{regex};
+		     push @filenames, $File::Find::name
+		       if ($File::Find::name =~ m/$regex/);
+		   }
+		 },
+		 preprocess => sub {
+		   my @return;
+		   foreach (@_) {
+		     push(@return,$_) unless (m/^.*\/?CVS$/ && $config{skipcvs});
+		   }
+		   return @return;
+		 },
+	       }, @dirs );
+      } else {
+	my @wildcards = @{$file_extensions{wildcards}};
+	print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
+	foreach my $directory (@dirs) {
+	  if ($directory eq 'CVS' and $config{skipcvs}) {
+	    warn "skipping $directory\n" unless ( $config{silent} );
+	    next;
 	  }
+	  print "searching $directory\n" unless ( $config{silent} );
+	  $directory =~ s|(.*)\/$|$1|;
+	  foreach my $wildcard (@wildcards) {
+	    print "$wildcard" unless ( $config{silent} );
+	    print " .. " , <$directory/*.$wildcard>, " \n";
+	    push @filenames, <$directory/*.$wildcard>;
+	  }
+	}
       }
-    elsif (@ARGV)
-      {	@filenames = @ARGV; }
-    else
-      {
-	print_instructions();
-	exit;
-      }
+    } elsif (@ARGV) {
+      @filenames = @ARGV;
+    } else {
+      print_instructions();
+      exit;
+    }
 
-    $config{filenames}    = \@filenames;
-    $config{use_stdout}   = (defined $args{'O'}) ? 1 : 0;
-    $config{templatefile} = (defined $args{'t'}) ? $args{'t'} : undef;
-    $config{outputfile}   = (defined $args{'o'}) ? $args{'o'} : "autodia.out.xml";
-    $config{no_deps}      = (defined $args{'D'}) ? 1 : 0;
-    $config{sort}         = (defined $args{'s'}) ? 1 : 0;
+      $config{filenames}    = \@filenames;
+      $config{use_stdout}   = (defined $args{'O'}) ? 1 : 0;
+      $config{templatefile} = (defined $args{'t'}) ? $args{'t'} : undef;
+      $config{outputfile}   = (defined $args{'o'}) ? $args{'o'} : "autodia.out.xml";
+      $config{no_deps}      = (defined $args{'D'}) ? 1 : 0;
+      $config{sort}         = (defined $args{'s'}) ? 1 : 0;
 
-    my $inputpath = "";
-    if (defined $args{'p'})
-      {
+      my $inputpath = "";
+      if (defined $args{'p'}) {
 	$inputpath = $args{'p'};
 	unless ($inputpath =~ m/\/$/)
-	  { $inputpath .= "/"; }
+	  {
+	    $inputpath .= "/";
+	  }
       }
 
-    $config{inputpath}    = $inputpath;
+      $config{inputpath}    = $inputpath;
 
-    return \%config;
-  }
+      return \%config;
+    }
 
 sub print_instructions {
   print "AutoDia - Automatic Dia XML. Copyright 2001 A Trevena\n\n";
@@ -179,13 +203,14 @@ autodia.pl -i filename -p ..      : use ../filename as input file
 autodia.pl -d directoryname       : use *.pl/pm in directoryname as input files
 autodia.pl -d 'foo bar quz'       : use *pl/pm in directories foo, bar and quz as input files
 autodia.pl -d directory -r        : use *pl/pm in directory and its subdirectories as input files
+autodia.pl -d directory -F        : use files in directory but only one file per diagram
+autodia.pl -d directory -C        : use files in directory but skip CVS directories
 autodia.pl -o outfile.xml         : use outfile.xml as output file (otherwise uses autodial.out.xml)
 autodia.pl -O                     : output to stdout
 autodia.pl -l language            : parse source as language (ie: C) and look for appropriate filename extensions if also -d
 autodia.pl -t templatefile        : use templatefile as template (otherwise uses default)
 autodia.pl -l DBI -i "mysql:test:localhost" -U username -P password : use the test database on localhost with username and password as username and password
 autodia.pl -z                     : use graphviz to produce dot, gif, jpg or png output
-autodia.pl -Z                     : use graphviz dot coords in dia output
 autodia.pl -v                     : output VCG digraph for use with VCG
 autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)
 autodia.pl -S                     : silent mode, no output to stdout except with -O
@@ -235,6 +260,10 @@ Helpful information, links and news can be found at the autodia website - http:/
 
 =item C<autodia.pl -d directory -r        : use *pl/pm in directory and its subdirectories as input files>
 
+=item C<autodia.pl -d directory -F        : use files in directory but only one file per diagram>
+=item C<autodia.pl -d directory -C        : use files in directory but skip CVS directories>
+
+
 =item C<autodia.pl -o outfile.xml         : use outfile.xml as output file (otherwise uses autodial.out.xml)>
 
 =item C<autodia.pl -O                     : output to stdout>
@@ -246,8 +275,6 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -l DBI -i "mysql:test:localhost" -U username -P password : use test database on localhost with username and password as username and password>
 
 =item C<autodia.pl -z                     : use graphviz 'yeah, baby!'>
-
-=item C<autodia.pl -Z                     : use graphviz dot coords in dia output>
 
 =item C<autodia.pl -v                     : output VCG digraph for use with VCG>
 
