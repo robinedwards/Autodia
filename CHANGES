@@ -1,6 +1,10 @@
 Changes to AutoDia
 ------------------
 
+version 1.10 22/12/2003
+- fixed object attributes bug in Perl Handler
+- fixed bug in Diagram class that caused crash
+
 version 1.9 10/12/2003
 - added support for 'use public' and 'use private' in Perl Handler (experimental)
 - fixed bug in DBI handler (thanks to the two people who pointed out the schoolboy error)

@@ -1094,7 +1094,7 @@ sub plot_branch {
       $self->{_dia_nodes}{$b}{weight} <=> $self->{_dia_nodes}{$a}{weight}
     } @{$node->{children}};
     unshift (@sorted_children, pop(@sorted_children));
-    my $child_increment = (scalar @{$self->{_dia_rows}[$depth + 1]}) ? $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]}): 0 ;
+    my $child_increment = (ref $self->{_dia_rows}[$depth + 1]) ? $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]}): 0 ;
     my $childpos = 0;
     if ( $side eq 'left' ) {
       $childpos = 0

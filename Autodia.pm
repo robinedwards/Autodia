@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.9";
+        $VERSION = "1.10";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers

@@ -197,7 +197,7 @@ sub _parse {
 
     # if line contains object attributes parse add to class
     if ($line =~ m/\$(class|self|this)\-\>\{['"]*(.*?)["']*}/) {
-      my $attribute_name = $1;
+      my $attribute_name = $2;
       my $attribute_visibility = ( $attribute_name =~ m/^\_/ ) ? 1 : 0;
 
       $Class->add_attribute({
