@@ -3,11 +3,17 @@
 
 #########################
 
-# change 'tests => 1' to 'tests => last_test_to_print';
-
 use Test;
-BEGIN { plan tests => 1 };
+BEGIN { plan tests => 3 };
+
+warn "checking Autodia.pm\n";
+
 use Autodia;
+
+ok(1); # If we made it this far, we're ok.
+
+warn "checking classes\n";
+
 use Autodia::Diagram;
 use Autodia::Diagram::Class;
 use Autodia::Diagram::Object;
@@ -16,10 +22,14 @@ use Autodia::Diagram::Inheritance;
 use Autodia::Diagram::Superclass;
 use Autodia::Diagram::Component;
 use Autodia::Handler;
-ok(1); # If we made it this far, we're ok.
 
-#########################
+ok(2);
 
-# Insert your test code below, the Test module is use()ed here so read
-# its man page ( perldoc Test ) for help writing this test script.
+warn "checking handlers..\n";
 
+foreach ( qw/SQL Cpp Perl PHP Java DBI dia/ ) {
+  eval " use Autodia::Handler::$_ ; ";
+  warn "couldn't compile Autodia::Handler::$_ : ignoring..\n" if $@;
+}
+
+ok(3);

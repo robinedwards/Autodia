@@ -353,10 +353,8 @@ sub export_graphviz
     my $classes = $self->Classes;
     if (ref $classes) { 
       foreach my $Class (@$classes) {
-#	warn "class name : ", $Class->Name , " id :", $Class->Id, "\n";
-	my $node = '{'.$Class->Name."|";
 
-	warn "node : $node\n";
+	my $node = '{'.$Class->Name."|";
 
 	if ($config{methods}) {
 	  my @method_strings = ();

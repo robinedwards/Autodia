@@ -1,6 +1,11 @@
 Changes to AutoDia
 ------------------
 
+version 1.6 30/03/2002
+- fixed SQL handler
+- improved test suite
+
+
 version 1.5 28/03/2002
 - fixes to DBI handler 
 - added SQL handler
