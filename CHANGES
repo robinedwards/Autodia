@@ -1,6 +1,16 @@
 Changes to AutoDia
 ------------------
 
+version 1.5 28/03/2002
+- fixes to DBI handler 
+- added SQL handler
+- fixes to c++ handler
+- fixes to Perl handler
+- added dia handler
+- added new options for hiding/showing attributes/methods
+- added new option to hide private/hidden attributes/methods
+- tidied up code and distribution
+
 version 1.4 12/02/2002
 - Added better support for GraphViz and output in png, jpg and dot
 - added experimental support for VCG

@@ -98,7 +98,7 @@ sub _parse {
       my $componentName = $2;
 
       # discard if stopword
-      next if ($componentName =~ /^(strict|vars|exporter|autoloader|warnings.*|constant.*|data::dumper|\d|lib)$/i);
+      next if ($componentName =~ /^(strict|vars|exporter|autoloader|warnings.*|constant.*|data::dumper|carp.*|overload|switch|\d|lib)$/i);
 
       # check package exists before doing stuff
       $self->_is_package(\$Class, $filename);
@@ -186,7 +186,7 @@ sub _parse {
     }
 
     # if line contains object attributes parse add to class
-    if ($line =~ m/[(\$class|\$self|\$this|shift\(?\)?)]\-\>\{\"*(.*?)\"*}/) {
+    if ($line =~ m/\$(class|self|this)\-\>\{['"]*(.*?)["']*}/) {
       my $attribute_name = $1;
       my $attribute_visibility = ( $attribute_name =~ m/^\_/ ) ? 1 : 0;
 

@@ -17,6 +17,7 @@ use Autodia::Handler;
 @ISA = qw(Autodia::Handler Exporter);
 
 use Autodia::Diagram;
+use Data::Dumper;
 use DBI;
 
 #---------------------------------------------------------------
@@ -62,27 +63,29 @@ sub _parse_file { # parses dbi-connection string
     for my $field (@fields) {
       $Class->add_attribute({
 			     name => $field,
-			     visibility => 2,
+			     visibility => 0,
+			     type => '',
 			    });
 
       if (my $dep = $self->_is_foreign_key($table, $field)) {
-	my $exists_already = $self->{Diagram}->add_superclass($dep);
+	my $Superclass = Autodia::Diagram::Superclass->new($dep);
+	my $exists_already = $self->{Diagram}->add_superclass($Superclass);
 	if (ref $exists_already) {
-	  $dep = $exists_already;
+	  $Superclass = $exists_already;
 	}
 	# create new relationship
-	my $Relationship = Autodia::Diagram::Inheritance->new($Class, $dep);
+	my $Relationship = Autodia::Diagram::Inheritance->new($Class, $Superclass);
 	# add Relationship to superclass
-	$dep->add_inheritance($Relationship);
+	$Superclass->add_inheritance($Relationship);
 	# add Relationship to class
 	$Class->add_inheritance($Relationship);
 	# add Relationship to diagram
 	$self->{Diagram}->add_inheritance($Relationship);
-	$self->{Diagram}->add_inheritance();
       }
     }
 
   }
+  $dbh->disconnect;
 }
 
 sub _is_foreign_key {
@@ -104,7 +107,7 @@ sub _discard_line
 
 ###############################################################################
 
-=head1 NAME 
+=head1 NAME
 
 Autodia::Handler::DBI.pm - AutoDia handler for DBI connections
 

@@ -8,6 +8,14 @@
 use Test;
 BEGIN { plan tests => 1 };
 use Autodia;
+use Autodia::Diagram;
+use Autodia::Diagram::Class;
+use Autodia::Diagram::Object;
+use Autodia::Diagram::Dependancy;
+use Autodia::Diagram::Inheritance;
+use Autodia::Diagram::Superclass;
+use Autodia::Diagram::Component;
+use Autodia::Handler;
 ok(1); # If we made it this far, we're ok.
 
 #########################

@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "1.4";
+        $VERSION = "1.5";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -42,6 +42,7 @@ sub getHandlers
 		    "php"	=> 'Autodia::Handler::PHP',
 		    "dbi"       => 'Autodia::Handler::DBI',
 		    "dia"       => 'Autodia::Handler::dia',
+		    "sql"       => 'Autodia::Handler::SQL',
 		   );
     print "getting handlers..\n" unless ( $config{silent} );
     return \%handlers;

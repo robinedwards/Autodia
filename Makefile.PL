@@ -12,7 +12,8 @@ WriteMakefile(
 				File::Find   => 0,
 				Template     => 0,
 				GraphViz     => 0,
-				VCG	     => 0,
+				VCG	     => 0.4,
+				XML::Simple  => 0,
 			    }, 
     'EXE_FILES' => [ 'autodia.pl', 'autodia_java.pl' ],
     

@@ -16,13 +16,10 @@ use File::Find;
 
 use Autodia;
 
-
 # get configuration from command line
 my %args=();
-getopts("sSDOmrhi:o:p:d:t:l:zZvVU:P:",\%args);
+getopts("sSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
 my %config = %{get_config(\@ARGV,\%args)};
-
-
 
 print "\n\nAutoDia - version ".$Autodia::VERSION."(c) Copyright 2003 A Trevena\n\n" unless ( $config{silent} );
 
@@ -38,7 +35,7 @@ print "using language : ", $config{language}, "\n" unless ( $config{silent} );
 if (defined $language_handlers{lc($config{language})})
   {
     my $handler_module = $language_handlers{lc($config{language})};
-    eval "require $handler_module" or die "can't find $handler_module : $!\n";
+    eval "require $handler_module" or die "can't run $handler_module : $! : $@\n";
     print "\n..using $handler_module\n" unless ( $config{silent} );
     $handler = "$handler_module"->new(\%config);
   }
@@ -65,7 +62,7 @@ sub get_config
     my %args = %{shift()};
 
     if (defined $args{'V'}) {
-      print "\n\nAutoDia - version ".$Autodia::VERSION."(c) copyright 2001 A Trevena\n\n";
+      print "\n\nAutoDia - version ".$Autodia::VERSION."(c) copyright 2003 A Trevena\n\n";
       exit;
     }
 
@@ -88,8 +85,20 @@ sub get_config
     $config{graphvizdia} = (defined $args{'Z'}) ? 1 : 0;
     $config{vcg} = (defined $args{'v'}) ? 1 : 0;
 
-    $config{username} = (defined $args{'U'}) ? $args{'l'} : "root";
-    $config{password} = (defined $args{'P'}) ? $args{'l'} : "";
+    $config{username} = (defined $args{'U'}) ? $args{'U'} : "root";
+    $config{password} = (defined $args{'P'}) ? $args{'P'} : "";
+
+    $config{methods}  = 1;
+    $config{attributes} = 1;
+    $config{public} = (defined $args{'H'}) ? 1 : 0;
+
+    if ( $args{'m'} || $args{'A'}) {
+      $config{attributes} = 0;
+    }
+
+    if ( $args{'M'} || $args{'a'}) {
+      $config{methods} = 0;
+    }
 
     Autodia->setConfig(\%config);
 
@@ -180,6 +189,11 @@ autodia.pl -Z                     : use graphviz dot coords in dia output
 autodia.pl -v                     : output VCG digraph for use with VCG
 autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)
 autodia.pl -S                     : silent mode, no output to stdout except with -O
+autodia.pl -H                     : show only public/visible methods and attributes
+autodia.pl -m                     : show only Class methods
+autodia.pl -M                     : do not show Class Methods
+autodia.pl -a                     : show only Class Attributes
+autodia.pl -A                     : do not show Class Attributes
 autodia.pl -h                     : display this help message
 autodia.pl -V                     : display copyright message and version number
 end
@@ -236,6 +250,16 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -Z                     : use graphviz dot coords in dia output>
 
 =item C<autodia.pl -v                     : output VCG digraph for use with VCG>
+
+=item C<autodia.pl -H                     : show only Public/Visible methods>
+
+=item C<autodia.pl -m                     : show only Class methods>
+
+=item C<autodia.pl -M                     : do not show Class Methods>
+
+=item C<autodia.pl -a                     : show only Class Attributes>
+
+=item C<autodia.pl -A                     : do not show Class Attributes>
 
 =item C<autodia.pl -S                     : silent mode, no output to stdout except with -O>
 

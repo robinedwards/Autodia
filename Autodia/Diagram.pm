@@ -356,32 +356,38 @@ sub export_graphviz
 #	warn "class name : ", $Class->Name , " id :", $Class->Id, "\n";
 	my $node = '{'.$Class->Name."|";
 
-	my @method_strings = ();
-	my @attribute_strings = ();
- 	my ($methods) = ($Class->Operations);
-	foreach my $method (@$methods) {
-	  my $method_string = ($method->{visibility} == 0) ? '+ ' : '- ';
-	  $method_string .= $method->{name}."(";
-	  if (ref $method->{"Param"} ) {
-	    my @args = ();
-	    foreach my $argument ( @{$method->{"Param"}} ) {
-	      push (@args, $argument->{Type} . " " . $argument->{Name});
-	    }
-	    $method_string .= join (", ",@args);
-	  }
-	  $method_string .= " ) : ". $method->{type};
-	  push (@method_strings,$method_string);
-	}
-	foreach my $method_string ( @method_strings ) {
-	  $node .= "$method_string".'\l';
-	}
+	warn "node : $node\n";
 
+	if ($config{methods}) {
+	  my @method_strings = ();
+	  my ($methods) = ($Class->Operations);
+	  foreach my $method (@$methods) {
+	    next if ($method->{visibility} == 1 && $config{public});
+	    my $method_string = ($method->{visibility} == 0) ? '+ ' : '- ';
+	    $method_string .= $method->{name}."(";
+	    if (ref $method->{"Param"} ) {
+	      my @args = ();
+	      foreach my $argument ( @{$method->{"Param"}} ) {
+		push (@args, $argument->{Type} . " " . $argument->{Name});
+	      }
+	      $method_string .= join (", ",@args);
+	    }
+	    $method_string .= " ) : ". $method->{type};
+	    push (@method_strings,$method_string);
+	  }
+	  foreach my $method_string ( @method_strings ) {
+	    $node .= "$method_string".'\l';
+	  }
+	}
 	$node .= "|";
-	my ($attributes) = ($Class->Attributes);
-	foreach my $attribute (@$attributes) {
-	  $node .= ($attribute->{visibility} == 0) ? '+ ' : '- ';
-	  $node .= $attribute->{name};
-	  $node .= " : ".$attribute->{type}.'\l';
+	if ($config{attributes}) {
+	  my ($attributes) = ($Class->Attributes);
+	  foreach my $attribute (@$attributes) {
+	    next if ($attribute->{visibility} == 1 && $config{public});
+	    $node .= ($attribute->{visibility} == 0) ? '+ ' : '- ';
+	    $node .= $attribute->{name};
+	    $node .= " : ".$attribute->{type}.'\l';
+	  }
 	}
 
 	$node .= '}';
@@ -398,7 +404,10 @@ sub export_graphviz
     if (ref $superclasses) {
       foreach my $Superclass (@$superclasses) {
 #	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
-	my $node = '{'.$Superclass->Name."|\n}";
+	my $node = $Superclass->Name;
+	$node=~ s/[\{\}]//g;
+	$node = '{'.$node."|\n}";
+	warn "node : $node\n";
 	$nodes{$Superclass->Id} = $node;
 	$g->add_node($node,shape=>'record');
       }
@@ -420,6 +429,7 @@ sub export_graphviz
       foreach my $Component (@$components) {
 #	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
 	my $node = '{'.$Component->Name.'}';
+	warn "node : $node\n";
 	$nodes{$Component->Id} = $node;
 	$g->add_node($node, shape=>'record');
       }
@@ -470,32 +480,36 @@ sub export_vcg {
       #	warn "class name : ", $Class->Name , " id :", $Class->Id, "\n";
       my $node = $Class->Name."\n----------------\n";
 
-      my @method_strings = ();
-      my @attribute_strings = ();
-      my ($methods) = ($Class->Operations);
-      foreach my $method (@$methods) {
-	my $method_string = ($method->{visibility} == 0) ? '+ ' : '- ';
-	$method_string .= $method->{name}."(";
-	if (ref $method->{"Param"} ) {
-	  my @args = ();
-	  foreach my $argument ( @{$method->{"Param"}} ) {
-	    push (@args, $argument->{Type} . " " . $argument->{Name});
+      if ($config{methods}) {
+	my @method_strings = ();
+	my ($methods) = ($Class->Operations);
+	foreach my $method (@$methods) {
+	  next if ($method->{visibility} == 1 && $config{public});
+	  my $method_string = ($method->{visibility} == 0) ? '+ ' : '- ';
+	  $method_string .= $method->{name}."(";
+	  if (ref $method->{"Param"} ) {
+	    my @args = ();
+	    foreach my $argument ( @{$method->{"Param"}} ) {
+	      push (@args, $argument->{Type} . " " . $argument->{Name});
+	    }
+	    $method_string .= join (", ",@args);
 	  }
-	  $method_string .= join (", ",@args);
+	  $method_string .= " ) : ". $method->{type};
+	  push (@method_strings,$method_string);
 	}
-	$method_string .= " ) : ". $method->{type};
-	push (@method_strings,$method_string);
+	foreach my $method_string ( @method_strings ) {
+	  $node .= "$method_string\n";
+	}
       }
-      foreach my $method_string ( @method_strings ) {
-	$node .= "$method_string\n";
-      }
-
       $node .= "----------------\n";
-      my ($attributes) = ($Class->Attributes);
-      foreach my $attribute (@$attributes) {
-	$node .= ($attribute->{visibility} == 0) ? '+ ' : '- ';
-	$node .= $attribute->{name};
-	$node .= " : $attribute->{type} \n";
+      if ($config{attributes}) {
+	my ($attributes) = ($Class->Attributes);
+	foreach my $attribute (@$attributes) {
+	  next if ($attribute->{visibility} == 1 && $config{public});
+	  $node .= ($attribute->{visibility} == 0) ? '+ ' : '- ';
+	  $node .= $attribute->{name};
+	  $node .= " : $attribute->{type} \n";
+	}
       }
 
       $nodes{$Class->Id} = $node;

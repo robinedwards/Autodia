@@ -81,6 +81,7 @@ sub _parse
 	      $self->{in_class} = 1;
 	      $self->{privacy} = "private";
 	      $self->{visibility} = 1;
+	      $classname =~ s/[\{\}]//g;
 	      $Class = Autodia::Diagram::Class->new($classname);
 	      $Diagram->add_class($Class);
 
@@ -265,12 +266,12 @@ sub _parse
 		  while ($have_continuation)
 		    {
 		      my $line = <$fh>;
+		      last unless ($line);
 		      chomp $line;
-#		      print "line $i (cont) : $line \n";
 
 		      if ($line =~ m/^                        # start of line
                                      \s*                      # whitespace
-                                     ([\w\,\s\*=&\"]*)        # all parameters: $1
+			             ([\w\,\|\s\*=&\"]*)      # all parameters: $1
                                      (\)?)                    # may be an ending bracket: $2
                                      [\w\s=]*(;?)             # possibly end of signature $3
                                      .*$/x)
