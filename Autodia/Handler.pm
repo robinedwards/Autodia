@@ -63,17 +63,30 @@ sub output
     $Diagram->remove_duplicates;
 
     # export output
-    my $success;
-    if ($config{graphviz}) {
-      $self->{Config}{outputfile} = "$alternative_filename.png" if ($config{singlefile});
-      $success = $Diagram->export_graphviz(\%config);
-    } elsif ($config{vcg}) {
-      $self->{Config}{outputfile} = "$alternative_filename.ps" if ($config{singlefile});
-      $success = $Diagram->export_vcg(\%config);
-    } else {
-      $self->{Config}{outputfile} = "$alternative_filename.xml" if ($config{singlefile});
-      $success = $Diagram->export_xml(\%config);
-    }
+    my $success = 0;
+    OUTPUT_TYPE: {
+	    if ($config{graphviz}) {
+		$self->{Config}{outputfile} = "$alternative_filename.png" if ($config{singlefile});
+		$success = $Diagram->export_graphviz(\%config);
+		last;
+	    }
+
+	    if ($config{springgraph}) {
+		$self->{Config}{outputfile} = "$alternative_filename.png" if ($config{singlefile});
+		$success = $Diagram->export_springgraph(\%config);
+		last;
+	    }
+
+	    if ($config{vcg}) {
+		$self->{Config}{outputfile} = "$alternative_filename.ps" if ($config{singlefile});
+		$success = $Diagram->export_vcg(\%config);
+		last;
+	    }
+
+	    # default to XML output
+	    $self->{Config}{outputfile} = "$alternative_filename.xml" if ($config{singlefile});
+	    $success = $Diagram->export_xml(\%config);
+	} # end of OUTPUT_TYPE;
     if ($success) {
 	warn "written outfile : $config{outputfile} successfully \n";
     } else {

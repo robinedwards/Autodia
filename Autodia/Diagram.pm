@@ -1,7 +1,7 @@
 ################################################################
-# Autodial - Automatic Dia XML.   (C)Copyright 2001 A Trevena  #
+# Autodia - Automatic Dia XML.   (C)Copyright 2001 A Trevena   #
 #                                                              #
-# AutoDIAL comes with ABSOLUTELY NO WARRANTY; see COPYING file #
+# AutoDia comes with ABSOLUTELY NO WARRANTY; see COPYING file  #
 # This is free software, and you are welcome to redistribute   #
 # it under certain conditions; see COPYING file for details    #
 ################################################################
@@ -368,11 +368,11 @@ sub export_graphviz
 	    if (ref $method->{"Param"} ) {
 	      my @args = ();
 	      foreach my $argument ( @{$method->{"Param"}} ) {
-		push (@args, $argument->{Type} . " " . $argument->{Name});
+		  push (@args, ((defined ($argument->{Type}) )? $argument->{Type} . " " . $argument->{Name} : $argument->{Name}));
 	      }
-	      $method_string .= join (", ",@args);
+	      $method_string .= join (", ",@args) if (scalar @args);
 	    }
-	    $method_string .= " ) : ". $method->{type};
+	    $method_string .= " ) : ". (defined $method->{type} ? $method->{type} : '');
 	    push (@method_strings,$method_string);
 	  }
 	  foreach my $method_string ( @method_strings ) {
@@ -449,7 +449,7 @@ sub export_graphviz
     }
 
     open (FILE,">$output_filename") or die "couldn't open $output_filename file for output : $!\n";
-
+    binmode FILE;
     eval 'print FILE $g->'. $dot_filetypes{$extension};
 
     close FILE;
@@ -457,6 +457,122 @@ sub export_graphviz
     return 1;
   }
 
+
+########################################################
+# export_springgraph - output to file via SpringGraph.pm
+
+sub export_springgraph
+  {
+    my $self = shift;
+    my %config          = %{$self->{_config}};
+
+    require SpringGraph;
+    require Data::Dumper;
+
+    my $output_filename = $config{outputfile};
+    my ($extension) = reverse (split(/\./,$output_filename));
+    $extension = "gif" unless ($dot_filetypes{$extension});
+    $output_filename =~ s/\.[^\.]+$/.$extension/;
+
+    my $g = new SpringGraph;
+
+    my %nodes = ();
+    my $classes = $self->Classes;
+    if (ref $classes) { 
+      foreach my $Class (@$classes) {
+
+	my $node = $Class->Name."|";
+
+	if ($config{methods}) {
+	  my @method_strings = ();
+	  my ($methods) = ($Class->Operations);
+	  foreach my $method (@$methods) {
+	    next if ($method->{visibility} == 1 && $config{public});
+	    my $method_string = ($method->{visibility} == 0) ? '+ ' : '- ';
+	    $method_string .= $method->{name}."(";
+	    if (ref $method->{"Param"} ) {
+	      my @args = ();
+	      foreach my $argument ( @{$method->{"Param"}} ) {
+		  push (@args, ((defined ($argument->{Type}) )? $argument->{Type} . " " . $argument->{Name} : $argument->{Name}));
+	      }
+	      $method_string .= join (", ",@args) if (scalar @args);
+	    }
+	    $method_string .= " ) : ". (defined $method->{type} ? $method->{type} : '');
+	    push (@method_strings,$method_string);
+	  }
+	  foreach my $method_string ( @method_strings ) {
+	    $node .= "$method_string\n";
+	  }
+	}
+	$node .= "|";
+	if ($config{attributes}) {
+	  my ($attributes) = ($Class->Attributes);
+	  foreach my $attribute (@$attributes) {
+	    next if ($attribute->{visibility} == 1 && $config{public});
+	    $node .= "\n" . ($attribute->{visibility} == 0) ? '+ ' : '- ';
+	    $node .= $attribute->{name};
+	    $node .= " : ".$attribute->{type} if (defined $attribute->{type});
+	    $node .= "\n";
+	  }
+	}
+
+	$nodes{$Class->Id} = $Class->Name;
+
+	$g->add_node($Class->Name, label=>$node,shape=>'record');
+
+      }
+    } else {
+      return 0;
+    }
+
+    my $superclasses = $self->Superclasses;
+
+    if (ref $superclasses) {
+      foreach my $Superclass (@$superclasses) {
+#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
+	my $node = $Superclass->Name;
+	$node=~ s/[\{\}]//g;
+	$node .= "|\n";
+#	warn "node : $node\n";
+	$nodes{$Superclass->Id} = $node;
+	$g->add_node($node,label=>$node,shape=>'record');
+      }
+    }
+
+    my $inheritances = $self->Inheritances;
+    if (ref $inheritances) {
+      foreach my $Inheritance (@$inheritances) {
+#	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
+	$g->add_edge(
+		     $nodes{$Inheritance->Parent}=>$nodes{$Inheritance->Child},
+		     dir=>'1',
+		    );
+      }
+    }
+
+    my $components = $self->Components;
+    if (ref $components) {
+      foreach my $Component (@$components) {
+#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
+	my $node = $Component->Name;
+#	warn "node : $node\n";
+	$nodes{$Component->Id} = $node;
+	$g->add_node($node,label=>$node, shape=>'record');
+      }
+    }
+
+    my $dependancies = $self->Dependancies;
+    if (ref $dependancies) {
+      foreach my $Dependancy (@$dependancies) {
+	  #	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
+	  $g->add_edge( $nodes{$Dependancy->Parent}=>$nodes{$Dependancy->Child}, style=>'dashed',dir=>1);
+      }
+    }
+
+    $g->as_png($output_filename);
+
+    return 1;
+  }
 
 ####################################################
 # export_vcg - output to file via VCG.pm and xvcg
@@ -565,7 +681,7 @@ sub export_vcg {
   }
 
   open (FILE,">$output_filename") or die "couldn't open $output_filename file for output : $!\n";
-
+  binmode FILE;
   eval 'print FILE $vcg->'. $vcg_filetypes{$extension} or die "can't eval : $! \n";;
 
   close FILE;
@@ -585,7 +701,8 @@ sub export_xml
     my %config          = %{$self->{_config}};
 
     my $output_filename = $config{outputfile};
-    my $template_file   = $config{templatefile} || get_default_template();
+    warn "output filename : $output_filename\n";
+    my $template_file   = $config{templatefile} || get_template(%config);
 
     if ($config{no_deps})
       { $self->_no_deps; }
@@ -928,39 +1045,75 @@ sub _layout_dia_new {
   my $increment = $widest_row / ( scalar @toprow + 1 );
   my $pos = $increment;
   my $y = 0 - ( ( $self->{_dia_total_height} / 2) - 5 );
+  my $done2ndrow = 0;
   foreach my $node ( @toprow ) {
-    my $x = 0 - ( $self->{_dia_row_widths}[0] * $self->{_dia_widest_row} / 2)
-      + ($pos * $self->{_dia_row_widths}[0]);
-    $nodes{$node}{xx} = $x;
-    $nodes{$node}{yy} = $y;
-    $nodes{$node}{entity}->set_location($x,$y);
-    if (scalar @{$nodes{$node}{children}} && ( scalar @{$rows[1]} > 0)) {
-      my @sorted_children = sort {
-	$nodes{$b}{weight} <=> $nodes{$a}{weight}
-      } @{$nodes{$node}{children}};
-      unshift (@sorted_children, pop(@sorted_children));
-      my $child_increment = $widest_row / (scalar @{$rows[1]});
-      my $childpos = $child_increment;
-#      foreach my $child (@{$nodes{$node}{children}}) {
-      foreach my $child (@sorted_children) {
-	my $side;
-	if ($childpos <= ( $widest_row * 0.385 ) ) {
-	  $side = 'left';
-	} elsif ( $childpos <= ($widest_row * 0.615 ) ) {
-	  $side = 'center';
-	} else {
-	  $side = 'right';
-	}
-	plot_branch($self,$nodes{$child},$childpos,$side);
-	$childpos += $child_increment;
+      my $x = 0 - ( $self->{_dia_row_widths}[0] * $self->{_dia_widest_row} / 2)
+	  + ($pos * $self->{_dia_row_widths}[0]);
+      $nodes{$node}{xx} = $x;
+      $nodes{$node}{yy} = $y;
+      $nodes{$node}{entity}->set_location($x,$y);
+      if (scalar @{$nodes{$node}{children}} && ( scalar @{$rows[1]} > 0)) {
+	  my @sorted_children = sort {
+	      $nodes{$b}{weight} <=> $nodes{$a}{weight}
+	  } @{$nodes{$node}{children}};
+	  unshift (@sorted_children, pop(@sorted_children));
+	  my $child_increment = $widest_row / (scalar @{$rows[1]});
+	  my $childpos = $child_increment;
+	  #      foreach my $child (@{$nodes{$node}{children}}) {
+	  foreach my $child (@sorted_children) {
+	      my $side;
+	      if ($childpos <= ( $widest_row * 0.385 ) ) {
+		  $side = 'left';
+	      } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
+		  $side = 'center';
+	      } else {
+		  $side = 'right';
+	      }
+	      plot_branch($self,$nodes{$child},$childpos,$side);
+	      $childpos += $child_increment;
+	  }
+      } elsif ( scalar @{$rows[1]} && $done2ndrow == 0) {
+	  $done2ndrow = 1;
+	  foreach my $node ( @{$rows[1]} ) {
+	      #		warn "handling node in next row\n";
+	      #		warn Dumper(node=>$node{$node});
+	  
+	      my $x = 0 - ( $self->{_dia_row_widths}[1] * $self->{_dia_widest_row} / 2)
+		  + ($pos * $self->{_dia_row_widths}[1]);
+	      $nodes{$node}{x} = $x;
+	      $nodes{$node}{'y'} = $y;
+	      if (scalar @{$nodes{$node}{children}} && scalar @{$rows[2]}) {
+		  my @sorted_children = sort {
+		      $nodes{$b}{weight} <=> $nodes{$a}{weight}
+		  } @{$nodes{$node}{children}};
+		  unshift (@sorted_children, pop(@sorted_children));
+		  my $child_increment = $widest_row / (scalar @{$rows[2]});
+		  my $childpos = $child_increment;
+		  #      foreach my $child (@{$nodes{$node}{children}}) {
+		  foreach my $child (@sorted_children) {
+		      #			warn "child : $child\n";
+		      next unless ($child);
+		      my $side;
+		      if ($childpos <= ( $widest_row * 0.385 ) ) {
+			  $side = 'left';
+		      } elsif ( $childpos <= ($widest_row * 0.615 ) ) {
+			  $side = 'center';
+		      } else {
+			  $side = 'right';
+		      }
+		      plot_branch($self,$nodes{$child},$childpos,$side);
+		      $childpos += $child_increment;
+		  }
+	      }
+	  }
       }
-    }
-    $nodes{$node}{pos} = $pos;
-
-    $pos += $increment;
-    $done{$node} = 1;
+      
+      $nodes{$node}{pos} = $pos;
+      
+      $pos += $increment;
+      $done{$node} = 1;
   }
-
+  
   my @relationships = ();
 
   if (ref $self->Dependancies)
@@ -1307,9 +1460,113 @@ sub xml_escape {
   return $retval;
 }
 
-sub get_default_template
-{
-my $template = <<'END_TEMPLATE';
+
+sub get_template {
+    my %config = @_;
+    warn "get_template called : outfile -- $config{outputfile}\n";
+    my $template;
+ TEMPLATE_SWITCH: {
+	if ($config{outputfile} =~ /\.xmi$/) {
+	    $template = get_umbrello_template($config{outputfile});
+	    last TEMPLATE_SWITCH;
+	}
+	$template = get_default_template($config{outputfile});
+    }				# end of TEMPLATE_SWITCH
+    warn "template : ", $template, "\n";
+    # NOTE: $template should always be a ref to a string
+    return $template;
+}
+
+sub get_umbrello_template {
+    my $outfile = shift;
+    warn "getting umbrello template for $outfile\n";
+    my $pwd = $ENV{PWD};
+    my $template =<<END_UMBRELLO_TEMPLATE;
+<?xml version="1.0" encoding="UTF-8"?>
+<XMI xmlns:UML="org.omg/standards/UML" verified="false" timestamp="" xmi.version="1.2" >
+ <XMI.header>
+  <XMI.documentation>
+   <XMI.exporter>umbrello uml modeller http://uml.sf.net</XMI.exporter>
+   <XMI.exporterVersion>1.1</XMI.exporterVersion>
+  </XMI.documentation>
+  <XMI.model xmi.name="autodiagenerated-$outfile" href="$pwd/$outfile" />
+  <XMI.metamodel xmi.name="UML" href="UML.xml" xmi.version="1.3" />
+ </XMI.header>
+ <XMI.content>
+  <docsettings viewid="2" documentation="" uniqueid="4" />
+  <umlobjects>
+  [%# -------------------------------------------- %]
+  [% classes = diagram.Classes %]
+  [% FOREACH class = classes %]
+   <UML:Class stereotype="[% class.Parent %]" package="" xmi.id="[% class.Id %]" abstract="0" documentation="" name="[% class.Name %]" static="0" scope="200">
+      [% FOREACH at = class.Attributes %]
+      <UML:Attribute stereotype="" package="" xmi.id="[% at.Id %]" value="[% at.value %]" type="[% at.type %]" abstract="0"
+documentation="" name="[% at.name %]" static="0" scope="200" />
+      [% END %]
+      [% FOREACH op = class.Operations %]
+      <UML:Operation stereotype="" package="" xmi.id="[% op.Id %]" type="[% op.type %]" abstract="0" documentation="" name="[% op.name %]" static="0" scope="200" >
+         [% FOREACH par = op.Param %]
+         <UML:Parameter stereotype="" package="" xmi.id="[% par.Id %]" value="[% par.value %]" type="[% par.type %]" abstract="0" documentation="" name="[% par.name %]" static="0" scope="200" />
+         [% END %]
+      </UML:Operation>
+      [% END %]
+   </UML:Class>
+
+   [% END %]
+  </umlobjects>
+  <diagrams>
+   <diagram snapgrid="0" showattsig="1" fillcolor="#ffffc0" showgrid="0" showopsig="1" usefillcolor="1" snapx="10" snapy="10" showatts="1" 
+                         xmi.id="2" documentation="" type="402" showops="1" showpackage="0" name="class diagram" localid="30000" 
+                         showstereotype="0" showscope="1" font="Sans,10,-1,5,50,0,0,0,0,0" linecolor="#ff0000" >
+    <widgets>
+    [%# -------------------------------------------- %]
+    [% classes = diagram.Classes %]
+    [% FOREACH class = classes %]
+     <UML:ConceptWidget usesdiagramfillcolour="0" width="[% class.Width %]" showattsigs="601" usesdiagramusefillcolour="0" 
+                        x="[% class.left_x %]" linecolour="#ff0000" y="[% class.top_y %]" showopsigs="601" usesdiagramlinecolour="0" 
+                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showattributes="1" xmi.id="[% class.Id %]" 
+                        showoperations="1" showpackage="0" showscope="1" showstereotype="0" font="Sans,10,-1,5,50,0,0,0,0,0" />
+    [% END %]
+    [% SET superclasses = diagram.Superclasses %]
+    [% FOREACH class = superclasses %]
+     <UML:ConceptWidget usesdiagramfillcolour="0" width="[% class.Width %]" showattsigs="601" usesdiagramusefillcolour="0" 
+                        x="[% class.left_x %]" linecolour="#ff0000" y="[% class.top_y %]" showopsigs="601" usesdiagramlinecolour="0" 
+                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showattributes="1" xmi.id="[% class.Id %]" 
+                        showoperations="1" showpackage="0" showscope="1" showstereotype="0" font="Sans,10,-1,5,50,0,0,0,0,0" />
+
+    [% END %]
+    </widgets>
+    <messages/>
+    <associations>
+    [% SET inheritances = diagram.Inheritances %]
+    [% FOREACH inheritance = inheritances %]
+     <UML:AssocWidget totalcounta="2" indexa="1" totalcountb="2" indexb="1" widgetbid="[% inheritance.Parent %]" widgetaid="[% inheritance.Child %]" documentation="" type="500" >
+      <linepath>
+       <startpoint startx="[% inheritance.left_x %]" starty="[% inheritance.top_y %]" />
+       <endpoint endx="[% inheritance.right_x %]" endy="[% inheritance.bottom_y %]" />
+      </linepath>
+     </UML:AssocWidget>
+    [% END %]
+    </associations>
+   </diagram>
+  </diagrams>
+  <listview>
+   <listitem open="1" type="800" id="-1" label="Views" >
+    <listitem open="1" type="801" id="-1" label="Logical View" >
+     <listitem open="0" type="807" id="2" label="class diagram" />
+    </listitem>
+    <listitem open="1" type="802" id="-1" label="Use Case View" />
+   </listitem>
+  </listview>
+ </XMI.content>
+</XMI>
+END_UMBRELLO_TEMPLATE
+    return \$template;
+}
+
+sub get_default_template {
+    warn "getting default (dia) template\n";
+    my $template = <<'END_TEMPLATE';
 <?xml version="1.0"?>
 [%# #################################################### %]
 [%# AutoDIAL Template for Dia XML. (c)Copyright 2001 Ajt %]
@@ -1674,8 +1931,7 @@ my $template = <<'END_TEMPLATE';
 </dia:diagram>
 END_TEMPLATE
 
-return \$template;
-
+    return \$template;
 }
 
 1;
@@ -1684,15 +1940,15 @@ return \$template;
 
 =head1 NAME
 
-Diagram - Class to hold a collection of objects representing parts of a Dia Diagram.
+Autodia::Diagram - Class to hold a collection of objects representing parts of a Dia Diagram.
 
 =head1 SYNOPSIS
 
-use Diagram;
+use Autodia::Diagram;
 
 =item class methods
 
-$Diagram = Diagram->new;
+$Diagram = Autodia::Diagram->new;
 
 =item object data methods
 
@@ -1733,7 +1989,19 @@ The diagram is laid out and output to a file using the export_xml() method.
 
 =head2 See Also
 
-DiagramObject DiagramClass DiagramSuperclass DiagramComponent DiagramInheritance DiagramDependancy
+Autodia
+
+Autodia::Diagram::Object
+
+Autodia::Diagram::Class 
+
+Autodia::Diagram::Superclass 
+
+Autodia::Diagram::Component 
+
+Autodia::Diagram::Inheritance
+
+Autodia::Diagram::Dependancy
 
 =cut
 

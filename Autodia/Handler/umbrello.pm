@@ -46,11 +46,18 @@ sub _parse {
   my $Diagram  = $self->{Diagram};
   my $xmldoc = XMLin($filename, ForceArray => 1, ForceContent => 1);
 
+  # get version
+  my $version = $xmldoc->{'XMI.header'}[0]{'XMI.documentation'}[0]{'XMI.exporterVersion'}[0]{content};
+  my $is_newstyle = 0;
+  if ($version =~ /(\d\.\d).\d/) {
+      $is_newstyle = 1 if ($1 > 1.1);
+  }
+  my $umlclasses_are_here = ( $is_newstyle ) ? 'UML:Model' : 'umlobjects' ;
   my @relationships;
 
-  foreach my $classname (keys %{$xmldoc->{'XMI.content'}[0]{'umlobjects'}[0]{'UML:Class'}}) {
+  foreach my $classname (keys %{$xmldoc->{'XMI.content'}[0]{$umlclasses_are_here}[0]{'UML:Class'}}) {
       print "handling Class $classname : \n";
-      my $class = $xmldoc->{'XMI.content'}[0]{'umlobjects'}[0]{'UML:Class'}{$classname};
+      my $class = $xmldoc->{'XMI.content'}[0]{$umlclasses_are_here}[0]{'UML:Class'}{$classname};
       my $Class = Autodia::Diagram::Class->new($classname);
       $Diagram->add_class($Class);
 

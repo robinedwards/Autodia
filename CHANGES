@@ -1,6 +1,19 @@
 Changes to AutoDia
 ------------------
 
+version 2.00 14/07/2004
+- added umbrello output (experimental - doesn't seem to work)
+- fixed Perl Handler to cope with perl scripts as well as modules [bug reported via debian]
+- small tweak to Perl Handler to stop it complaining about uninitiated values at line 375
+- fixed python handler so inheritance works properly
+- fixed C++ handler to handle namespaces in types
+- fixed C++ handler to cope with inheriting from public foo or foo
+- fixed SQL handler to handle linebreaks in table declarations
+- fixed Umbrello Handler to cope with <= 1.1 and now >= 1.2.0 or style files
+- fix to Diagram module to ensure binary files are output in BINMODE for when on win32
+- added SpringGraph output (very experimental, only works for basic diagrams, sometimes)
+- slight improvement to dia layout algorithm
+
 version 1.99 19/03/2004
 - rebadged 1.12 to meet version number requirements on cpan
 
@@ -10,7 +23,7 @@ version 1.12 17/03/2004
 - skipcvs option now also skips RCS dirs
 - fix to C++ handler to cope with comments like /* .. */ on single line
 - fixes to Torque handler
-- added umbrello input handler
+- added umbrello input handler (experimental)
 - synchronised autodia_java.pl with autodia.pl
 
 version 1.11 23/12/2003

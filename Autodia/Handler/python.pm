@@ -58,7 +58,10 @@ sub _parse {		# parses python source code
   $Diagram->add_class($Module);
   my $Class = $Module;
 
+  my %aliases = ();
+
   # process file
+  my $class_count = 0;
   foreach my $line (<$fh>) {
     next if  $self->_discard_line (\$line);
     # count spaces / tabs to see how deep indented
@@ -77,9 +80,11 @@ sub _parse {		# parses python source code
     if ( $line =~ m/^[\s\t]*def\s+(\S+)\s*\((.*)\):/ ) {
       my %method = ( "name" => $1, );
       $method{"visibility"} = ($method{"name"} =~ m/^\_/) ? 1 : 0;
-      my @params = split(/\s*,\s*/,$2);
-      foreach (@params) {
-	push (@{$method{"Param"}},{Name => $_, Val => '',});
+      my $params = $2 || '';
+      if ($params) {
+	  foreach (split(/\s*,\s*/,$params)) {
+	      push (@{$method{"Param"}},{Name => $_, Val => '',});
+	  }
       }
       $Class->add_operation(\%method);
     }
@@ -87,33 +92,48 @@ sub _parse {		# parses python source code
     # catch class
     if ( $line =~ /^class\s+(\w+).*:/ ) {
       my $classname = $1;
-      if ( $line =~ /\((.*)\)/) {
-	my @superclasses = split(/[\,\s]/,$1);
-	foreach my $super (@superclasses) {
-	  # create superclass
-	  my $Superclass = Autodia::Diagram::Superclass->new($super);
-	  # add superclass to diagram
-	  my $exists_already = $Diagram->add_superclass($Superclass);
-	  if (ref $exists_already) {
-	    $Superclass = $exists_already;
-	  }
-	  # create new inheritance
-	  my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
-	  # add inheritance to superclass
-	  $Superclass->add_inheritance($Inheritance);
-	  # add inheritance to class
-	  $Class->add_inheritance($Inheritance);
-	  # add inheritance to diagram
-	  $Diagram->add_inheritance($Inheritance);
-	}
-      }
-      print "\n";
-      $in_class = 1;
-      $exit_depth = $depth;
       $current_class = "$module_name.$classname";
       $Class = Autodia::Diagram::Class->new("$module_name.$classname");
       $Diagram->add_class($Class);
+      $aliases{$classname} = $Class;
+
+      warn "got class name : $classname\n";
+      warn " line : $line \n";
+      if ( $line =~ /\((.*)\)/) {
+	  my @superclasses = split(/[\,\s]/,$1);
+	  foreach my $super (@superclasses) {
+	      # create superclass
+	      warn "have superclass : $super\n";
+	      next unless ($super=~/\S/);
+	      my $Superclass;
+	      # check if superclass exists already
+	      if ($aliases{$super}) {
+		  $Superclass = $aliases{$super};
+		  warn "found alias for superclass $super - ",$Superclass->Name , "\n";
+	      } else {
+		  $Superclass = Autodia::Diagram::Superclass->new($super);
+		  # add superclass to diagram
+		  my $exists_already = $Diagram->add_superclass($Superclass);
+		  if (ref $exists_already) {
+		      warn "superclass exists already";
+		      $Superclass = $exists_already;
+		  }
+		  $aliases{$super} = $Superclass;
+	      }
+	      # create new inheritance
+	      my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+	      # add inheritance to superclass
+	      $Superclass->add_inheritance($Inheritance);
+	      # add inheritance to class
+	      $Class->add_inheritance($Inheritance);
+	      # add inheritance to diagram
+	      $Diagram->add_inheritance($Inheritance);
+	  }
+      }
+      $in_class = 1;
+      $exit_depth = $depth;
     }
+
     # catch object attributes via self.foo or this.foo
     if ( $line =~ /(self|this)\.(\w+)\.?/ ) {
       my $attribute = $2;

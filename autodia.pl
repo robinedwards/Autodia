@@ -80,7 +80,7 @@ sub get_config {
     $config{graphviz} = (defined $args{'z'}) ? 1 : 0;
     $config{language} = (defined $args{'l'}) ? $args{'l'} : "perl";
     $config{silent}   = (defined $args{'S'}) ? 1 : 0;
-    $config{graphvizdia} = (defined $args{'Z'}) ? 1 : 0;
+    $config{springgraph} = (defined $args{'Z'}) ? 1 : 0;
     $config{vcg} = (defined $args{'v'}) ? 1 : 0;
 
     $config{singlefile} = (defined $args{'F'}) ? 1 : 0;
@@ -218,7 +218,8 @@ autodia.pl -l language            : parse source as language (ie: C) and look fo
 autodia.pl -t templatefile        : use templatefile as template (otherwise uses default)
 autodia.pl -l DBI -i "mysql:test:localhost" -U username -P password : use the test database on localhost with username and password as username and password
 autodia.pl -z                     : use graphviz to produce dot, gif, jpg or png output
-autodia.pl -v                     : output VCG digraph for use with VCG
+autodia.pl -Z                     : use springgraph to produce png output
+autodia.pl -v                     : use vcg to output postscript
 autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)
 autodia.pl -S                     : silent mode, no output to stdout except with -O
 autodia.pl -H                     : show only public/visible methods and attributes
@@ -281,9 +282,11 @@ Helpful information, links and news can be found at the autodia website - http:/
 
 =item C<autodia.pl -l DBI -i "mysql:test:localhost" -U username -P password : use test database on localhost with username and password as username and password>
 
-=item C<autodia.pl -z                     : use graphviz 'yeah, baby!'>
+=item C<autodia.pl -z                     : output via graphviz>
 
-=item C<autodia.pl -v                     : output VCG digraph for use with VCG>
+=item C<autodia.pl -Z                     : output via springgraph>
+
+=item C<autodia.pl -v                     : output via VCG >
 
 =item C<autodia.pl -H                     : show only Public/Visible methods>
 

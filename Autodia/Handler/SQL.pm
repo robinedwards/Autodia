@@ -58,8 +58,9 @@ sub _parse {
     next if ($self->_discard_line($fileline)); # discard comments and garbage
     # If we have a create line, then we need to finish off the
     # last table (if any) and start a new one.
-    if ($fileline =~ /create table (.*?) \(?/i) {
+    if ($fileline =~ /create\stable\s(\w*) ?\(?/i) {
       $table = $1;
+      warn "line : $fileline\n";
       print "found new table : $table \n";
       # create new 'class' representing table
       $Class = Autodia::Diagram::Class->new($table);

@@ -94,7 +94,7 @@ sub _parse
 		  foreach my $super (@superclasses)
 		    {
 		      warn "superclass : $super\n";
-		      $super =~ s/^\s*\w+\s+([A-Za-z0-9\_]+)\s*$/$1/;
+		      $super =~ s/^\s*(\w+\s+)?([A-Za-z0-9\_]+)\s*$/$2/;
 		      warn "superclass : $super\n";
 		      my $Superclass = Autodia::Diagram::Superclass->new($super);
 		      my $exists_already = $Diagram->add_superclass($Superclass);
@@ -187,10 +187,11 @@ sub _parse
 		  last LINE;
 		}
 
-	      # check for simple declarations
-	      if ($line =~ m/^\s*(\w+\s*\*?)\s*(\w+)\s*\;.*$/)
+		  # check for simple declarations
+		  # space* const? space+ (namespace::)* type space* modifier? space+ name;
+		  if ($line =~ m/^\s*\w*?\s*((\w+\s*::\s*)*\w+\s*[\*&]?)\s*(\w+)\s*\;.*$/)        # Added support for pointers/refs/namespaces
 		{
-		  my $name = $2;
+		  my $name = $3;
 		  my $type = $1;
 #		  print "found simple variable declaration : name = $name, type = $type\n";
 
@@ -208,22 +209,22 @@ sub _parse
 	      # check for simple sub
 	      if ($line =~ m/^                       # start of line
                             \s*                      # whitespace
-                            (\w*?\s*?\w*?\*?)        # type of the method: $1
+                            (\w*?\s*?(\w+\s*::\s*)*\w*?\s*[\*&]?) # type of the method: $1. Added support for namespaces
                             \s*                      # whitespace
                             (~?\w+)                  # name of the method: $2
                             \s*                      # whitespace
                             \(\s*                    # start of parameter list
-                            ([\w\,\s\*=&\"]*)        # all parameters: $3
+                            ([:\w\,\s\*=&\"]*)        # all parameters: $3
                             (\)?)                    # may be an ending bracket: $4
                             [\w\s=]*(;?)             # possibly end of signature $5
                             .*$/x
 		 )
 		{
-		  my $name = $2;
+		  my $name = $3;
 		  my $type = $1 || "void";
-		  my $params = $3;
-		  my $end_bracket = $4;
-		  my $end_semicolon = $5;
+		  my $params = $4;
+		  my $end_bracket = $5;
+		  my $end_semicolon = $6;
 
 		  my $have_continuation = 0;
 		  my $have_end_semicolon= 0;
@@ -271,7 +272,7 @@ sub _parse
 
 		      if ($line =~ m/^                        # start of line
                                      \s*                      # whitespace
-			             ([\w\,\|\s\*=&\"]*)      # all parameters: $1
+			             ([:\w\,\|\s\*=&\"]*)      # all parameters: $1
                                      (\)?)                    # may be an ending bracket: $2
                                      [\w\s=]*(;?)             # possibly end of signature $3
                                      .*$/x)
@@ -301,8 +302,8 @@ sub _parse
 		  foreach my $parameter (@params)
 		    {
 		      $parameter =~ s/const\s+//;
-		      $parameter =~ m/\s*(\w+\s*[\*|\&]?)\s*(\w+)/ ;
-		      my ($type, $name) = ($1,$2);
+		      $parameter =~ m/\s*((\w+::)*\w+\s*[\*|\&]?)\s*(\w+)/ ;
+		      my ($type, $name) = ($1,$3);
 
 		      $type =~ s/\s//g;
 		      $name =~ s/\s//g;
@@ -339,12 +340,13 @@ sub _parse
 		}
 
 	      # if line starts with word,space,word then its a declaration (probably)
-	      if ($line =~ m/\s*\w+\s+\w+/i)
+	      # Broken.
+	      if ($line =~ m/\s*\w+\s+(\w+\s*::\s*)*\w+/i)
 		{
 #		  print " probably found a declaration : $line\n";
 		  my @words = m/^(\w+)\s*[\(\,\;].*$/g;
 		  my $name = $&;
-		  my $rest = $';
+		  my $rest = $';#' to placate some syntax highlighters
 		  my $type = '';
 
 		  my $pc = 0; # point count (ie location in array)
@@ -498,88 +500,89 @@ sub _discard_line
 ####-----
 
 sub _parse_private_things {
-  my $self = shift;
-  my $line = shift;
-  my $Class = shift;
+    my $self = shift;
+    my $line = shift;
+    my $Class = shift;
 
-  return unless ($line =~ m/^\s*private\s*\w*:\s*(\w.*)$/);
-#  print "found private/public things\n";
-  my @private_things = split(";",$1);
-  foreach my $private_thing (@private_things) {
-#    print "- private/public thing : $private_thing\n";
-    $private_thing =~ m/^\s*(public|private)?:?\s*(static|virtual)\s*(\w+\s*\*?)\s*(\w+\(?[\w\s]*\)?)\s*\w*\s*\w*.*$/;
-    my $name = $4;
-    my $type = "$2 $3";
-    my $vis = $1 || $self->{visibility};
-#    print "- found declaration : name = $name, type = $type\n";
+    return unless ($line =~ m/^\s*private\s*\w*:\s*(\w.*)$/);
+    #  print "found private/public things\n";
+    my @private_things = split(";",$1);
+    foreach my $private_thing (@private_things) {
+	print "- private/public thing : $private_thing\n";
+	# FIXME : Next line type definition seems erroneous. Any C++ hackers care to check it?
+	$private_thing =~ m/^\s*(public|private)?:?\s*(static|virtual)\s*(\w+\s*\*?)\s*(\w+\(?[\w\s]*\)?)\s*\w*\s*\w*.*$/;
+	my $name = $4;
+	my $type = "$2 $3";
+	my $vis = $1 || $self->{visibility};
+	#    print "- found declaration : name = $name, type = $type\n";
 
-    if ($name =~ /\(/) {
-#      print "-- declaration is a method \n";
-      # check for simple sub
-      if ($private_thing =~ m/^                       # start of line
+	if ($name =~ /\(/) {
+	    #      print "-- declaration is a method \n";
+	    # check for simple sub
+	    if ($private_thing =~ m/^                       # start of line
                              \s*                      # whitespace
                              (?:public|private)?:?\s*
-                             (\w*?\s*?\w*?\*?)        # type of the method: $1
+                             (\w*?\s*?(\w+\s*::\s*)*\w*?\*?)        # type of the method: $1
 			     \s*                      # whitespace
                              (~?\w+)                  # name of the method: $2
                              \s*                      # whitespace
                              \(\s*                    # start of parameter list
-                             ([\w\,\s\*=&\"]*)        # all parameters: $3
+                             ([:\w\,\s\*=&\"]*)        # all parameters: $3
 			     (\)?) # may be an ending bracket: $4
 			     [\w\s=]*(;?)             # possibly end of signature $5
                              .*$/x
-	 ) {
-	my $name = $2;
-	my $type = $1 || "void";
-	my $params = $3;
-	my $end_bracket = $4;
-	my $end_semicolon = $5;
+	       ) {
+		my $name = $3;
+		my $type = $1 || "void";
+		my $params = $4;
+		my $end_bracket = $5;
+		my $end_semicolon = $6;
 
-	my $have_continuation = 0;
-	my $have_end_semicolon= 1;
+		my $have_continuation = 0;
+		my $have_end_semicolon= 1;
 
-	$params    =~ s|\s+$||;
-	my @params = split(",",$params);
-	my $pc = 0; # parameter count
+		$params    =~ s|\s+$||;
+		my @params = split(",",$params);
+		my $pc = 0;	# parameter count
 
-	my %subroutine = (
-			  name       => $name,
-			  type       => $type,
-			  visibility => $self->{visibility},
-			 );
+		my %subroutine = (
+				  name       => $name,
+				  type       => $type,
+				  visibility => $self->{visibility},
+				 );
 
 
-	# then get parameters and types
-	my @parameters = ();
-#	print "All parameters: ",join(';',@params),"\n";
-	foreach my $parameter (@params) {
-	  $parameter =~ s/const\s+//;
+		# then get parameters and types
+		my @parameters = ();
+		#	print "All parameters: ",join(';',@params),"\n";
+		foreach my $parameter (@params) {
+		    $parameter =~ s/const\s+//;
 
-	  my ($type, $name) = split(" ",$parameter);
+		    my ($type, $name) = split(" ",$parameter);
 
-	  $type =~ s/\s//g;
-	  $name =~ s/\s//g;
+		    $type =~ s/\s//g;
+		    $name =~ s/\s//g;
 
-	  $parameters[$pc] = {
-			      name => $name,
-			      type => $type,
-			     };
-	  $pc++;
+		    $parameters[$pc] = {
+					name => $name,
+					type => $type,
+				       };
+		    $pc++;
+		}
+
+		$subroutine{param} = \@parameters;
+		$Class->add_operation(\%subroutine);
+	    }
+	} else {
+	    #     print "-- declaration is an attribute \n";
+	    $Class->add_attribute({
+				   name => $name,
+				   visibility => $vis,
+				   type => $type,
+				  });
 	}
-
-	$subroutine{param} = \@parameters;
-	$Class->add_operation(\%subroutine);
-      }
-    } else {
- #     print "-- declaration is an attribute \n";
-      $Class->add_attribute({
-			     name => $name,
-			     visibility => $vis,
-			     type => $type,
-			    });
     }
-  }
-  return;
+    return;
 }
 
 sub _is_package

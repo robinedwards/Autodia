@@ -1,7 +1,7 @@
 ################################################################
-# AutoDIAL - Automatic Dia XML.   (C)Copyright 2001 A Trevena  #
+# AutoDia - Automatic Dia XML.   (C)Copyright 2001 A Trevena   #
 #                                                              #
-# AutoDIAL comes with ABSOLUTELY NO WARRANTY; see COPYING file #
+# AutoDia comes with ABSOLUTELY NO WARRANTY; see COPYING file  #
 # This is free software, and you are welcome to redistribute   #
 # it under certain conditions; see COPYING file for details    #
 ################################################################
