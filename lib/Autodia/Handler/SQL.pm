@@ -22,11 +22,15 @@ use Data::Dumper;
 #---------------------------------------------------------------
 
 my %data_types = (
-		  varchar => [qw/varchar2 nvarchar/],
-		  integer => [qw/longint shortint int bigint tinyint/],
-		  text    => [qw/ntext/],
-		  float   => [qw/long curr double/],
-		  date    => [qw/datetime smalldate smalldatetime time/],
+		  varchar => [qw/varchar2 nvarchar varchar/],
+		  char    => [qw/char nchar/],
+		  integer => [qw/longint shortint int bigint smallint tinyint/],
+		  text    => [qw/ntext text/],
+		  blob    => [qw/blob binary varbinary image/],
+		  float   => [qw/long curr currency doublef float decimal numeric real money smallmoney/],
+		  date    => [qw/datetime smalldate smalldatetime time date/],
+		  boolean => [qw/bool boolean bit/],
+		  set     => [qw/enum set/],
 		 );
 
 #####################
@@ -52,32 +56,32 @@ sub _parse {
 
   # process tables
 
+  my %fields = ();
+  my %primary_keys = ();
+
   my $in_table = 0;
   my ($Class,$table);
   foreach my $fileline (<$fh>) {
     next if ($self->_discard_line($fileline)); # discard comments and garbage
     # If we have a create line, then we need to finish off the
     # last table (if any) and start a new one.
-    if ($fileline =~ /create\stable\s(\w*) ?\(?/i) {
+    if ($fileline =~ /^\s*create\s+table\s+(?:\[\w+\]\.)?[\`\'\"\[]?([\w\s]+)[\`\'\"\]]? ?\(?/i) {
       $table = $1;
-      warn "line : $fileline\n";
-      print "found new table : $table \n";
       # create new 'class' representing table
       $Class = Autodia::Diagram::Class->new($table);
       # add 'class' to diagram
       $self->{Diagram}->add_class($Class);
     } else {
-      print "found non-table line\n";
       # recognise lines that define columns
       my $matched = 0;
       foreach my $type (keys %data_types) {
 	my $pattern = join('|', ($type,@{$data_types{$type}}));
-	print "checking line : $fileline against pattern : $pattern\n";
-	if ($fileline =~ /\s*(\S+)\s+($pattern)\s*([\w\s\(\)]*),?\s*/i) {
-	  print "matched field \n";
+	if ($fileline =~ /\s*\[?(\S+?)\]?\s+\[?($pattern)\]?\s*([\w\s\(\)]*),?\s*/i) {
 	  $matched = 1;
 	  my ($field,$field_type,$extra_info) = ($1,$2,$3);
-	  print "field: $field, field_type : $field_type\n";
+	  if ($extra_info =~ /^\s*(\([\d\s]+\))/) {
+	    $field_type .= $1;
+	  }
 	  $Class->add_attribute({
 				 name => $field,
 				 visibility => 0,
@@ -98,14 +102,16 @@ sub _parse {
 	    $Class->add_inheritance($Relationship);
 	    # add Relationship to diagram
 	    $self->{Diagram}->add_inheritance($Relationship);
+	  } else {
+	    push (@{$fields{$field}}, $Class);
 	  }
 
-	  if ($extra_info =~ m/primary[\s_-]key\s*/i ) {
-	    print "found PK\n";
+	  if ($extra_info =~ m/(identity|primary[\s_-]key)\s*/i ) {
 	    my $pk_fields = $field;
 	    my $primary_key = { name=>'Primary Key', type=>'pk', Param=>[], visibility=>0, };
 	    foreach my $pk_field (split(/\s*,\s*/,$pk_fields) ) {
 	      push (@{$primary_key->{Param}}, { Name=>$pk_field, Type=>''});
+	      $primary_keys{$pk_field}= $Class;
 	    }
 	    $Class->add_operation($primary_key);
 	  }
@@ -115,26 +121,42 @@ sub _parse {
       }
       unless ($matched) {
 	# check for indexes and primary keys
-	print "checking for PK\n";
 	if ( $fileline =~ m/primary[\s_-]key\s*\((.*)\)\s*/i ) {
-	  print "found PK\n";
 	  my $pk_fields = $1;
 	  my $primary_key = { name=>'Primary Key', type=>'pk', Param=>[], visibility=>0, };
 	  foreach my $pk_field (split(/\s*,\s*/,$pk_fields) ) {
 	    push (@{$primary_key->{Param}}, { Name=>$pk_field, Type=>''});
+	    $primary_keys{$pk_field} = $Class;
 	  }
 	  $Class->add_operation($primary_key);
 	}
       }
     }
   }
+
+  # build additional fk's
+
+  foreach my $primary_key (keys %primary_keys) {
+    my $Superclass = $primary_keys{$primary_key};
+    foreach my $Class (@{$fields{$primary_key}}) {
+      # create new relationship
+      my $Relationship = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+      # add Relationship to superclass
+      $Superclass->add_inheritance($Relationship);
+      # add Relationship to class
+      $Class->add_inheritance($Relationship);
+      # add Relationship to diagram
+      $self->{Diagram}->add_inheritance($Relationship);
+    }
+  }
+
 }
 
 
 sub _is_foreign_key {
   my ($self, $table, $field) = @_;
   my $is_fk = undef;
-  if (($field !~ m/$table.id/i) && ($field =~ m/^(.*)[_-]id$/i)) {
+  if (($field !~ m/$table.u?id/i) && ($field =~ m/^(.*)[_-]u?id$/i)) {
     $is_fk = $1;
   }
   return $is_fk;
@@ -145,9 +167,9 @@ sub _discard_line
   my $self = shift;
   my $line = shift;
   my $return = 0;
+  $return = 1 if ( $line =~ m/^(INSERT|DROP|LOCK|ALTER|EXEC|GO)/i );
   $return = 1 if ( $line =~ m/^\s*(#|--|\/\*|\d+|\))/);
   $return = 1 if ( $line =~ m/^\s*$/);
-  print "skipping..\n" if $return;
   return $return;
 }
 

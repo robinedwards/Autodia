@@ -148,12 +148,12 @@ sub _parse
 	  $Component->add_dependancy($Dependancy);
 	}
 
-	if ($line =~ /^.*=\s*new\s+([^\s\(\)\{\}\;]+)/) {
+	if ($line =~ /^.*=\s*new\s+([^\s\(\)\{\}\;]+)/ || $line =~ /(\w+)::/) {
 	  my $componentName = $1;
 
 #	  print "componentname: $componentName matched on:\n$line\n";
 	  # discard if stopword
-	  next if ($componentName =~ /(strict|vars|exporter|autoloader|data::dumper)/i);
+	  next if ($componentName =~ /(self|parent|strict|vars|exporter|autoloader|data::dumper)/i);
 
 	  # check package exists before doing stuff
 	  $self->_is_package(\$Class, $filename);
@@ -178,20 +178,29 @@ sub _parse
 	  $Component->add_dependancy($Dependancy);
 	}
 
-
-	if ($line =~ /^\s*var\s+\$([^\s=\{\}\(\)]+)/) {
+	if ($line =~ /^\s*((((static|var|public|private|protected)\s+)+)\$|const\s+)([^\s=\{\}\(\)]+)/) {
 	    last unless $inclass;
-	    my $attribute_name = $1;
 	    my $default;
-	    $attribute_name =~ s/(.*);/$1/g;
-	    if ($line =~ /^\s*var\s+\$(\S+)\s*=\s*(.*)/) {
-	      $default = $2;
+           my $attribute_name = $5;
+           my $class_modifier = $1;
+           my $comment = ($class_modifier =~ m/static/) ? "static ": "";
+           $comment .= ($class_modifier =~ m/const/) ? "const": "";
+
+           my $attribute_visibility = ($class_modifier =~ m/(var|public|const)/) ? 0 : ($class_modifier =~ m/(protected)/) ? 2 : 1;
+
+
+           $attribute_name =~ s/(.*);/$1/;
+           if($attribute_name =~  m/^\_/ && $class_modifier =~ m/var/) {
+                $attribute_visibility = 1;
+           }
+
+           if ($line =~ /^\s*((((static|var|public|private|protected)\s+)+)\$|const\s+)(\S+)\s*=\s*(.*)/) {
+              $default = $6;
 	      $default =~ s/(.*);/$1/;
 	      $default =~ s/(.*)\/\/.*/$1/;
 	      $default =~ s/(.*)\/\*.*/$1/;
 	    }
 #	    print "Attr found: $attribute_name = $default\n$line\n";
-	    my $attribute_visibility = ( $attribute_name =~ m/^\_/ ) ? 1 : 0;
 	    $Class->add_attribute({
 				   name => $attribute_name,
 				   visibility => $attribute_visibility,
@@ -210,12 +219,17 @@ sub _parse
 	      $inclass = 1;
 	      $inclassparen = $up - $down;
 	    }
-	      my $subname = $1;
-	      $infunc = 1;
-	      $infuncparen = $up - $down;
-#	      print "Function found: $subname\n$line\n";
-	      my %subroutine = ( "name" => $subname, );
-	      $subroutine{"visibility"} = ($subroutine{"name"} =~ m/^\_/) ? 1 : 0;
+	  my $subname = $4;
+	  my $method_modifier = $1;
+
+	  $infunc = 1;
+	  $infuncparen = $up - $down;
+	  #	      print "Function found: $subname\n$line\n";
+	  my %subroutine = ( "name" => $subname, );
+	  $subroutine{"visibility"} = ($method_modifier =~ m/private/) ? 1 : ($method_modifier =~ m/protected/) ? 2 : ($subroutine{"name"}
+=~ m/^\_/) ? 1 : 0;
+	  $subroutine{"inheritance_type"} = ($method_modifier =~ m/abstract/) ? 0 : ($method_modifier =~ m/final/) ? 2 : 1;
+
 	      # check for explicit parameters
 	      if ($line =~ /function\s+(\S+)\s*\((.+?)\)/) 
 	      {
@@ -229,10 +243,19 @@ sub _parse
 		  foreach my $par (@parameters1) {
 		    my ($name, $val) = split (/=/, $par);
 		    $val =~ s/["']//g if (defined $val);
-		    $name =~ s/&//g;
+
+                   my $kind;
+                   if($name =~ m/&/) {
+                       $name =~ s/&//g;
+                       $kind = 3;
+                   } else {
+                       $kind = 1;
+                   }
+
 		    my %temphash = (
-				 Name => $name,
-				 Val => $val,
+				    Name => $name,
+				    Val => $val,
+				    Kind => $kind,
 				);
 		    push @parameters, \%temphash;
 

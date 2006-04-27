@@ -1,6 +1,30 @@
 Changes to AutoDia
 ------------------
 
+version 2.03 27/04/2006
+- basic Class::DBI support in perl handler
+- updated Umbrello
+- updated PHP to handle PHP 5
+- perl parsing improvments
+- improvements to Diagram.pm in Dia / Umbrello to filter non-xml-safe stuff, and use Kind field in Dia
+
+version 2.02 09/05/2005
+- no_deps is now deprecated : use -K instead
+- improvements to DBI handler
+  - now guesses foreign keys a bit better
+  - added support for datatypes
+- new option -k to skip superclasses
+- new option -K to skip dependancies
+- improvements and fixes to SQL Handler 
+  - now supports current (4.1.x) MySQL dumps
+  - now supports SQL Server SQL Dumps (when stripped of non-ascii crap)
+  - foreign key support improved
+  - datatypes improved
+- umbrello output fixed
+- minor fix to C++ Handling in Dia and Umbrello
+- additional templates directory with MySQL DDL template
+
+
 version 2.01 13/10/2004
 - improved perl handler support for 'fields' and 'base' pragma
 - applied Chris Karakas' fixes to Diagram module, PHP and Perl handlers

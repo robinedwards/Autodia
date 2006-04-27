@@ -16,20 +16,18 @@ use File::Find;
 
 use Autodia;
 
+my $handler;
+my $language_handlers = Autodia->getHandlers();
+my %language_handlers = %$language_handlers;
+
 # get configuration from command line
 my %args=();
-getopts("FCsSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
+getopts("KkFCsSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
 my %config = %{get_config(\@ARGV,\%args)};
 
 print "\n\nAutoDia - version ".$Autodia::VERSION."(c) Copyright 2003 A Trevena\n\n" unless ( $config{silent} );
 
 # create new diagram
-
-my $handler;
-
-my $language_handlers = Autodia->getHandlers();
-my %language_handlers = %$language_handlers;
-
 print "using language : ", $config{language}, "\n" unless ( $config{silent} );
 
 if (defined $language_handlers{lc($config{language})})
@@ -68,17 +66,21 @@ sub get_config {
 
     $args{'i'} =~ s/\"// if defined $args{'i'};
     $args{'d'} =~ s/\"// if defined $args{'d'};
+    $args{'l'} ||= 'perl';
 
     if ($args{'h'}) {
 	print_instructions();
 	exit;
     }
 
-    my %config = ();
+    my %config = ( args => \%args);
     my @filenames = ();
 
+    $config{skip_superclasses} = (defined $args{'k'}) ? 1 : 0;
+    $config{skip_packages} = (defined $args{'K'}) ? 1 : 0;
+
     $config{graphviz} = (defined $args{'z'}) ? 1 : 0;
-    $config{language} = (defined $args{'l'}) ? $args{'l'} : "perl";
+    $config{language} = $args{'l'};
     $config{silent}   = (defined $args{'S'}) ? 1 : 0;
     $config{springgraph} = (defined $args{'Z'}) ? 1 : 0;
     $config{vcg} = (defined $args{'v'}) ? 1 : 0;
@@ -88,6 +90,8 @@ sub get_config {
 
     $config{username} = (defined $args{'U'}) ? $args{'U'} : "root";
     $config{password} = (defined $args{'P'}) ? $args{'P'} : "";
+
+    $config{name} = (defined $args{n}) ? 1 : 0;
 
     $config{methods}  = 1;
     $config{attributes} = 1;
@@ -105,79 +109,88 @@ sub get_config {
 
     my %file_extensions = %{Autodia->getPattern()};
 
-    if (defined $args{'i'}) {
-	my $last;
-	if ($args{l} =~ /^dbi$/i) {
-	    $filenames[0] = $args{'i'};
-	    warn "have file : $filenames[0]\n";
-	} else {
-	    foreach my $filename ( split(" ",$args{'i'}) ) {
-		unless ( -f $filename ) {
-
-		    if ($last) {
-			$filename = "$last $filename";
-			unless (-f $filename) {
-			    warn "cannot find $filename .. ignoring\n";
-			    $last = $filename;
-			    next;
-			}
-		    } else {
-			$last = $filename;
-			warn "cannot find $filename .. ignoring\n";
-			next;
-		    }
-		}
-		undef $last;
-		push(@filenames,$filename);
-	    }
+    my $inputpath = "";
+    if (defined $args{'p'}) {
+      $inputpath = $args{'p'};
+      unless ($inputpath =~ m/\/$/)
+	{
+	  $inputpath .= "/";
 	}
     }
-    if (defined $args{'d'}) {
+
+    if ($config{name}) {
+      die "$config{language} does not support finding files by packagename"
+	unless ($language_handlers{lc($config{language})}->can('find_files_by_packagename'));
+      @filenames = find_files_by_packagename (\%config,\%args);
+    } else {
+
+      if (defined $args{'i'}) {
+	my $last;
+	if ($args{l} =~ /^dbi$/i) {
+	  $filenames[0] = $args{'i'};
+	  warn "have file : $filenames[0]\n";
+	} else {
+	  foreach my $filename ( split(" ",$args{'i'}) ) {
+	    unless ( -f $filename ) {
+
+	      if ($last) {
+		$filename = "$last $filename";
+		unless (-f $filename) {
+		  warn "cannot find $filename .. ignoring\n";
+		  $last = $filename;
+		  next;
+		}
+	      } else {
+		$last = $filename;
+		warn "cannot find $filename .. ignoring\n";
+		next;
+	      }
+	    }
+	    undef $last;
+	    push(@filenames,$filename);
+	  }
+	}
+      }
+      if (defined $args{'d'}) {
 	print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
 	my @dirs = split(" ",$args{'d'});
 	if (defined $args{'r'}) {
-	    print "recursively searching files..\n" unless ( $config{silent} );
-	    find ( { wanted => sub {
-			 unless (-d) {
-			     my $regex = $file_extensions{regex};
-			     push @filenames, $File::Find::name
-				 if ($File::Find::name =~ m/$regex/);
-			 }
-		     },
-		     preprocess => sub {
-			 my @return;
-			 foreach (@_) {
-			     push(@return,$_) unless (m/^.*\/?(CVS|RCS)$/ && $config{skipcvs});
-			 }
-			 return @return;
-		     },
-		   }, @dirs );
+	  print "recursively searching files..\n" unless ( $config{silent} );
+	  find ( { wanted => sub {
+		     unless (-d) {
+		       my $regex = $file_extensions{regex};
+		       push @filenames, $File::Find::name
+			 if ($File::Find::name =~ m/$regex/);
+		     }
+		   },
+		   preprocess => sub {
+		     my @return;
+		     foreach (@_) {
+		       push(@return,$_) unless (m/^.*\/?(CVS|RCS)$/ && $config{skipcvs});
+		     }
+		     return @return;
+		   },
+		 }, @dirs );
 	} else {
-	    my @wildcards = @{$file_extensions{wildcards}};
-	    print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
-	    foreach my $directory (@dirs) {
-		if ($directory =~ m/^(CVS|RCS)/ and $config{skipcvs}) {
-		    warn "skipping $directory\n" unless ( $config{silent} );
-		    next;
-		}
-		print "searching $directory\n" unless ( $config{silent} );
-		$directory =~ s|(.*)\/$|$1|;
-		foreach my $wildcard (@wildcards) {
-		    print "$wildcard" unless ( $config{silent} );
-		    print " .. " , <$directory/*.$wildcard>, " \n";
-		    push @filenames, <$directory/*.$wildcard>;
-		}
+	  my @wildcards = @{$file_extensions{wildcards}};
+	  print "searching files using wildcards : @wildcards \n" unless ( $config{silent} );
+	  foreach my $directory (@dirs) {
+	    if ($directory =~ m/^(CVS|RCS)/ and $config{skipcvs}) {
+	      warn "skipping $directory\n" unless ( $config{silent} );
+	      next;
 	    }
+	    print "searching $directory\n" unless ( $config{silent} );
+	    $directory =~ s|(.*)\/$|$1|;
+	    foreach my $wildcard (@wildcards) {
+	      print "$wildcard" unless ( $config{silent} );
+	      print " .. " , <$directory/*.$wildcard>, " \n";
+	      push @filenames, <$directory/*.$wildcard>;
+	    }
+	  }
 	}
+      }
     }
-    my $inputpath = "";
-    if (defined $args{'p'}) {
-	$inputpath = $args{'p'};
-	unless ($inputpath =~ m/\/$/)
-	    {
-		$inputpath .= "/";
-	    }
-    }
+
     $config{inputpath} = $inputpath;
 
 
@@ -221,6 +234,8 @@ autodia.pl -z                     : use graphviz to produce dot, gif, jpg or png
 autodia.pl -Z                     : use springgraph to produce png output
 autodia.pl -v                     : use vcg to output postscript
 autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)
+autodia.pl -K                     : process dependance but do not display in output
+autodia.pl -k                     : process inheritance but do not display in output
 autodia.pl -S                     : silent mode, no output to stdout except with -O
 autodia.pl -H                     : show only public/visible methods and attributes
 autodia.pl -m                     : show only Class methods
@@ -271,7 +286,6 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -d directory -F        : use files in directory but only one file per diagram>
 =item C<autodia.pl -d directory -C        : use files in directory but skip CVS directories>
 
-
 =item C<autodia.pl -o outfile.xml         : use outfile.xml as output file (otherwise uses autodial.out.xml)>
 
 =item C<autodia.pl -O                     : output to stdout>
@@ -287,6 +301,12 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -Z                     : output via springgraph>
 
 =item C<autodia.pl -v                     : output via VCG >
+
+=item c<autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)>
+
+=item C<autodia.pl -K                     : do not display packages that are not part of input>
+
+=item C<autodia.pl -k                     : do not display superclasses that are not part of input>
 
 =item C<autodia.pl -H                     : show only Public/Visible methods>
 

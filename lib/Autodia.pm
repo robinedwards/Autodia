@@ -15,7 +15,7 @@ use strict;
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "2.01";
+        $VERSION = "2.03";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -145,13 +145,13 @@ To add handlers or languages edit this file.
 
 =item To add a handler/parser
 
-Add the language or name of the parser and the name of the module to the %handlers hash in the get_handlers function.
+Add the language or name of the parser and the name of the module to the %handlers hash in the getHandlers function.
 
 for example :
 
 "perl"      => 'HandlerPerl',
 
-Documentation on writing yoru own handler can be found in the HandlerPerl and Handler perl modules
+Documentation on writing your own handler can be found in the HandlerPerl and Handler perl modules
 
 =item To add a new language or file extension or file matching patter
 

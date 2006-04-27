@@ -23,9 +23,41 @@ use Autodia::Diagram;
 #---------------------------------------------------------------
 
 #####################
-# Constructor Methods
+# Constructor / Class Methods
 
 # new inherited from Autodia::Handler
+
+sub find_files_by_packagename {
+    my $config = shift;
+    my $args = $config->{args};
+    my @filenames = ();
+    die "not implemented yet, sorry\n";
+    my @incdirs = @INC;
+    if ($config) {
+      unshift (@incdirs, split(" ",$args->{'d'}));
+    }
+
+    my @regexen = map ( s|::|\/|g, split(" ",$args->{'i'}));
+    find ( { wanted => sub {
+	       unless (-d) {
+		 foreach my $regex (@regexen) {
+		   push @filenames, $File::Find::name
+		     if ($File::Find::name =~ m/$regex/);
+		 }
+	       }
+	     },
+	     preprocess => sub {
+	       my @return;
+	       foreach (@_) {
+		 push(@return,$_) unless (m/^.*\/?(CVS|RCS)$/ && $config->{skipcvs});
+	       }
+	       return @return;
+	     },
+	   },
+	   @incdirs
+	 );
+    return @filenames;
+}
 
 #------------------------------------------------------------------------
 # Access Methods
@@ -42,9 +74,7 @@ sub _parse {
     my $fh       = shift;
     my $filename = shift;
     my $Diagram  = $self->{Diagram};
-
-    my $pkg_regexp = '[\w:]+';
-
+    my $pkg_regexp = '[A-Z][\w:]+';
     my $Class;
 
     # Class::Tangram bits
@@ -59,8 +89,12 @@ sub _parse {
     # parse through file looking for stuff
     my $continue_base = 0;
     my $continue_fields = 0;
+    my $continue_package = 0;
+    my $continue_cdbi_cols = 0;
 
+    my $line_no = 0;
     foreach my $line (<$fh>) {
+      $line_no++;
 	chomp $line;
 	if ($self->_discard_line($line)) {
 	    next;
@@ -68,38 +102,49 @@ sub _parse {
 
 
 	# if line contains package name then parse for class name
-	if ($line =~ /^\s*package\s+($pkg_regexp)/) {
-	    my $className = $1;
-	    # create new class with name
-	    $Class = Autodia::Diagram::Class->new($className);
-	    # add class to diagram
-	    $Class = $Diagram->add_class($Class);
+	if ($line =~ /^\s*package\s+($pkg_regexp)?;?/ || $continue_package) {
+	  $line =~ /^\s*($pkg_regexp);/ if($continue_package);
+	  if(!$1) {
+	    warn "No package name! line $line_no : $line\n";
+            $continue_package = 1;
+            next;
+	  }
+
+	  $continue_package = 0;
+	  my $className = $1;
+	  # create new class with name
+	  $Class = Autodia::Diagram::Class->new($className);
+	  # add class to diagram
+	  $Class = $Diagram->add_class($Class);
 	}
 
-	if ($line =~ /^\s*use\s+base\s+(?:q|qw|qq){0,1}\s*([\'\"\(\{\/\#])\s*(.*)\s*([\)\}\1]?)/ or $continue_base) {
+	if ($line =~ /^\s*use\s+base\s+(?:q|qw|qq)?\s*([\'\"\(\{\/\#])\s*([^\'\"\)\}\/\#]*)\s*(\1|[\)\}])?/ or ($continue_base && $line =~ /$continue_base/)) {
+
 	    my $superclass = $2;
+	    my $end = $3 || '';
+
 	    if ($continue_base) {
-		warn "continuing base\n";
+#		warn "continuing base\n";
 		$continue_base =~ s/[\)\}\'\"]/\\1/;
-		warn "base ctd : $continue_base\n";
-		warn "superclass : $superclass\n";
+#		warn "base ctd : $continue_base\n";
+#               warn "superclass : " . ($superclass|| '') . "\n";
+
 		if ( $line =~ /(.*)\s*$continue_base?/ ) {
 		    $continue_base = 0;
 		    $superclass = $1;
-		    warn "end of continued base\n";
+#		    warn "end of continued base\n";
 		}
 	    } else {
-		warn "start of base\n";
-		warn "superclass : $superclass\n";
+#		warn "start of base\n";
+#		warn "superclass : $superclass\n";
 		$continue_base = '[\)\}\'\"]';
-		if ($superclass =~ /(.*)([\)\}\'\"])/) {
-		    $superclass = $1;
-		    $continue_base = 0;
-		    warn "base is only 1 line\n";
+		if ($end) {
+		  $continue_base = 0;
+#		  warn "base is only 1 line\n";
 		}
-		warn "continue base : $continue_base\n";
+#		warn "continue base : $continue_base\n";
 	    }
-	    warn "superclass : $superclass\n";
+#	    warn "superclass : $superclass\n";
 
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
@@ -152,10 +197,10 @@ sub _parse {
 
 	    if ($line =~ /\s*use\s+(fields|private|public)\s+(?:q|qw|qq){0,1}\s*([\'\"\(\{\/\#])\s*(.*)\s*([\)\}\1]?)/ or $continue_fields) {
 		my ($pragma,$fields) = ($1,$3);
-		warn "pragma : $pragma .. fields : $fields\n";
+#		warn "pragma : $pragma .. fields : $fields\n";
 		if ($continue_fields) {
 		    $continue_fields =~ s/[\)\}\'\"]/\\1/;
-		    warn "fields ctd : $continue_fields\n";
+#		    warn "fields ctd : $continue_fields\n";
 		    if ( $line =~ m/(.*)\s*$continue_fields?/ ) {
 			$continue_fields = 0;
 			$fields = $1;
@@ -166,13 +211,13 @@ sub _parse {
 			$continue_fields = 0;
 			$fields = $1;
 		    }
-		    warn "continue fields : $continue_fields\n";
+#		    warn "continue fields : $continue_fields\n";
 		}
-		warn "fields : $fields\n";
+#		warn "fields : $fields\n";
 
 		my @fields = split(/\s+/,$fields);
 		foreach my $field (@fields) {
-		    warn "fields : $field\n";
+#		    warn "fields : $field\n";
 		    my $attribute_visibility = ( $field =~ m/^\_/ ) ? 1 : 0;
 		    unless ($pragma eq 'fields') {
 			$attribute_visibility = ($pragma eq 'private' ) ? 1 : 0;
@@ -180,6 +225,7 @@ sub _parse {
 		    $Class->add_attribute({
 					   name => $field,
 					   visibility => $attribute_visibility,
+					   Id => $Diagram->_object_count,
 					  }) unless ($field =~ /^\$/);
 		}
 	    } else {
@@ -241,7 +287,7 @@ sub _parse {
 			$Diagram->add_inheritance($Inheritance);
 		    }
 	    } else {
-		warn "ignoring empty \@ISA \n";
+		warn "ignoring empty \@ISA line $line_no \n";
 	    }
 	}
 
@@ -249,53 +295,53 @@ sub _parse {
 	if (ref $self) {
 	    if ($line =~ /^\s*(?:our|my)?\s+\$fields\s(.*)$/ and defined $self->{_is_tangram_class}{$Class->Name}) {
 		$self->{_field_string} = '';
-		warn "tangram parser : found start of fields for ",$Class->Name,"\n";
+#		warn "tangram parser : found start of fields for ",$Class->Name,"\n";
 		$self->{_field_string} = $1;
-		warn "field_string : $self->{_field_string}\n";
+#		warn "field_string : $self->{_field_string}\n";
 		$self->{_in_tangram_class} = 1;
 		if ( $line =~ /^(.*\}\s*;)/) {
-		    warn "found end of fields for  ",$Class->Name,"\n";
+#		    warn "found end of fields for  ",$Class->Name,"\n";
 		    $self->{_in_tangram_class} = 2;
 		}
 	    }
 	    if ($self->{_in_tangram_class}) {
 
 		if ( $line =~ /^(.*\}\s*;)/ && $self->{_in_tangram_class} == 1) {
-		    warn "found end of fields for  ",$Class->Name,"\n";
+#		    warn "found end of fields for  ",$Class->Name,"\n";
 		    $self->{_field_string} .= $1;
 		    $self->{_in_tangram_class} = 2;
 		} else {
-		    warn "adding line to fields for  ",$Class->Name,"\n";
+#		    warn "adding line to fields for  ",$Class->Name,"\n";
 		    $self->{_field_string} .= $line unless ($self->{_in_tangram_class} == 2);
 		}
 		if ($self->{_in_tangram_class} == 2) {
-		    warn "processing fields for ",$Class->Name,"\n";
+#		    warn "processing fields for ",$Class->Name,"\n";
 		    $_ = $self->{_field_string};
 		    s/^\s*\=\s*\{\s//;
 		    s/\}\s*;$//;
 		    s/[\s\n]+/ /g;
-		    warn "fields : $_\n";
+#		    warn "fields : $_\n";
 		    my %field_types = m/(\w+)\s*=>\s*[\{\[]\s*($pat1|$pat2|qw\([\w\s]+\))[\s,]*[\}\]]\s*,?\s*/g;
 
-		    warn Dumper(field_types=>%field_types);
+#		    warn Dumper(field_types=>%field_types);
 		    foreach my $field_type (keys %field_types) {
-			warn "handling $field_type..\n";
+#			warn "handling $field_type..\n";
 			$_ = $field_types{$field_type};
 			my $pat1 = '\'\w+\'\s*=>\s*\{.*?\}';
 			my $pat2 = '\'\w+\'\s*=>\s*undef';
 			my %fields;
 			if (/qw\((.*)\)/) {
 			    my $fields = $1;
-			    warn "qw fields : $fields\n";
+#			    warn "qw fields : $fields\n";
 			    my @fields = split(/\s+/,$fields);
 			    @fields{@fields} = @fields;
 			} else {
 			    %fields = m/[\'\"]?(\w+)[\'\"]?\s*=>\s*([\{\[].*?[\}\]]|undef)/g;
 			}
-			warn Dumper(fields=>%fields);
+#			warn Dumper(fields=>%fields);
 			foreach my $field (keys %fields) {
-			    warn "found field : '$field' of type '$field_type' in (class ",$Class->Name,") : \n";
-			    my $attribute = { name=>$field, type=>$field_type };
+#			    warn "found field : '$field' of type '$field_type' in (class ",$Class->Name,") : \n";
+			    my $attribute = { name=>$field, type=>$field_type, Id => $Diagram->_object_count, };
 			    if ($fields{$field} =~ /class\s*=>\s*[\'\"](.*?)[\'\"]/) {
 				$attribute->{type} = $1;
 			    }
@@ -314,6 +360,59 @@ sub _parse {
 	    }
 
 	}
+
+	# handle Class::DBI/Ima::DBI
+	if ($line =~ /->columns\(\s*All\s*=>\s*(.*)$/) {
+	  my $columns = $1;
+	  my @cols;
+	  if ($columns =~ s/^qw(.)//) {
+	    $columns =~ s/\s*[\)\]\}\/\#\|]\s*\)\s*;\s*(#.*)?$//;
+	    @cols = split(/\s+/,$columns);
+	  } elsif ($columns =~ /'.+'/) {
+	    @cols =  map( /'(.*)'/ ,split(/\s*,\s*/,$columns));
+	  } else {
+	    warn "can't parse CDBI style columns line $line_no\n";
+	    next;
+	  }
+
+	  foreach my $col ( @cols ) {
+	    # add attribute
+	    my $visibility = ( $col =~ m/^\_/ ) ? 1 : 0;
+	    $Class->add_attribute({
+				   name => $col,
+				   visibility => $visibility,
+				   Id => $Diagram->_object_count,
+				  });
+	    # add accessor
+	    $Class->add_operation({ name => $col, visibility => $visibility, Id => $Diagram->_object_count() } );
+	  }
+
+	  $continue_cdbi_cols = 1 unless $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
+	  next;
+	}
+
+	if ($continue_cdbi_cols) {
+	  my @cols;
+	  $continue_cdbi_cols = 0 if $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
+	  if ($line =~ /'.+'/) {
+	    $line =~ s/\s*[\)\]\}\/\#\|]\s*$//;
+	    @cols =  map( /'(.*)'/ ,split(/\s*,\s*/,$line));
+	  } else {
+	    @cols = split(/\s+/,$line);
+	  }
+	  foreach my $col ( @cols ) {
+	    # add attribute
+	    my $visibility = ( $col =~ m/^\_/ ) ? 1 : 0;
+	    $Class->add_attribute({
+				   name => $col,
+				   visibility => $visibility,
+				   Id => $Diagram->_object_count,
+				  });
+	    # add accessor
+	    $Class->add_operation({ name => $col, visibility => $visibility, Id => $Diagram->_object_count() } );
+	  }
+	}
+
 	# if line contains sub then parse for method data
 	if ($line =~ /^\s*sub\s+?(\w+)/) {
 	    my $subname = $1;
@@ -323,6 +422,7 @@ sub _parse {
 
 	    my %subroutine = ( "name" => $subname, );
 	    $subroutine{"visibility"} = ($subroutine{"name"} =~ m/^\_/) ? 1 : 0;
+	    $subroutine{"Id"} = $Diagram->_object_count();
 
 	    # NOTE : perl doesn't provide named parameters
 	    # if we wanted to be clever we could count the parameters
@@ -339,6 +439,7 @@ sub _parse {
 	    $Class->add_attribute({
 				   name => $attribute_name,
 				   visibility => $attribute_visibility,
+				   Id => $Diagram->_object_count,
 				  }) unless ($attribute_name =~ /^\$/);
 	}
 
@@ -348,7 +449,7 @@ sub _parse {
 	#	  {
 	#	    print "should be adding these arguments to sub : $1\n";
 	#	  }
-
+	
     }
 
     $self->{Diagram} = $Diagram;
@@ -418,6 +519,8 @@ sub _is_package
 
     return;
   }
+
+
 
 ####-----
 

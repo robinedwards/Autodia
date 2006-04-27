@@ -59,6 +59,19 @@ sub new
 ################
 # Access Methods
 
+sub add_inputfile {
+    my $self = shift;
+    my $inputfile = shift;
+    $self->{input_files}{$inputfile} = 1;
+    return;
+}
+
+sub is_inputfile {
+    my $self = shift;
+    my $name = shift;
+    return $self->{input_files}{$name};
+}
+
 
 sub add_dependancy
 {
@@ -249,6 +262,12 @@ sub Classes
     return $return;
   }
 
+
+sub InputFiles {
+    my $self = shift;
+    return $self->{input_files};
+}
+
 sub Components
   {
     my $self = shift;
@@ -409,50 +428,54 @@ sub export_graphviz
       return 0;
     }
 
-    my $superclasses = $self->Superclasses;
-
-    if (ref $superclasses) {
-      foreach my $Superclass (@$superclasses) {
-#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
-	my $node = $Superclass->Name;
-	$node=~ s/[\{\}]//g;
-	$node = '{'.$node."|\n}";
-#	warn "node : $node\n";
-	$nodes{$Superclass->Id} = $node;
-	$g->add_node($node,shape=>'record');
-      }
+    unless ($config{skip_superclasses}) {
+	my $superclasses = $self->Superclasses;
+	if (ref $superclasses) {
+	    foreach my $Superclass (@$superclasses) {
+		#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
+		my $node = $Superclass->Name;
+		$node=~ s/[\{\}]//g;
+		$node = '{'.$node."|\n}";
+		#	warn "node : $node\n";
+		$nodes{$Superclass->Id} = $node;
+		$g->add_node($node,shape=>'record');
+	    }
+	}
     }
-
     my $inheritances = $self->Inheritances;
     if (ref $inheritances) {
       foreach my $Inheritance (@$inheritances) {
-#	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
-	$g->add_edge(
-		     $nodes{$Inheritance->Parent}=>$nodes{$Inheritance->Child},
-		     dir=>'back',
-		    );
+	  next unless ($nodes{$Inheritance->Parent});
+	  #	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
+	  $g->add_edge(
+		       $nodes{$Inheritance->Parent}=>$nodes{$Inheritance->Child},
+		       dir=>'back',
+		      );
       }
     }
 
-    my $components = $self->Components;
-    if (ref $components) {
-      foreach my $Component (@$components) {
-#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
-	my $node = '{'.$Component->Name.'}';
-#	warn "node : $node\n";
-	$nodes{$Component->Id} = $node;
-	$g->add_node($node, shape=>'record');
-      }
+    unless ($config{skip_packages}) {
+	my $components = $self->Components;
+	if (ref $components) {
+	    foreach my $Component (@$components) {
+		#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
+		my $node = '{'.$Component->Name.'}';
+		#	warn "node : $node\n";
+		$nodes{$Component->Id} = $node;
+		$g->add_node($node, shape=>'record');
+	    }
+	}
     }
 
     my $dependancies = $self->Dependancies;
     if (ref $dependancies) {
       foreach my $Dependancy (@$dependancies) {
-#	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
-	$g->add_edge(
-		     $nodes{$Dependancy->Parent}=>$nodes{$Dependancy->Child},
-		     dir=>'back', style=>'dashed'
-		    );
+	  #	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
+	  next unless ($nodes{$Dependancy->Parent});
+	  $g->add_edge(
+		       $nodes{$Dependancy->Parent}=>$nodes{$Dependancy->Child},
+		       dir=>'back', style=>'dashed'
+		      );
       }
     }
 
@@ -465,6 +488,11 @@ sub export_graphviz
     return 1;
   }
 
+sub Warn {
+    my ($self,$warning) = @_;
+    warn "warning : $warning\n";
+    return;
+}
 
 ########################################################
 # export_springgraph - output to file via SpringGraph.pm
@@ -532,46 +560,49 @@ sub export_springgraph
     } else {
       return 0;
     }
-
-    my $superclasses = $self->Superclasses;
-
-    if (ref $superclasses) {
-      foreach my $Superclass (@$superclasses) {
-#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
-	my $node = $Superclass->Name;
-	$node=~ s/[\{\}]//g;
-	$node .= "|\n";
-#	warn "node : $node\n";
-	$nodes{$Superclass->Id} = $node;
-	$g->add_node($node,label=>$node,shape=>'record');
-      }
+    unless ($config{skip_superclasses}) {
+	my $superclasses = $self->Superclasses;
+	if (ref $superclasses) {
+	    foreach my $Superclass (@$superclasses) {
+		#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
+		my $node = $Superclass->Name;
+		$node=~ s/[\{\}]//g;
+		$node .= "|\n";
+		#	warn "node : $node\n";
+		$nodes{$Superclass->Id} = $node;
+		$g->add_node($node,label=>$node,shape=>'record');
+	    }
+	}
     }
-
     my $inheritances = $self->Inheritances;
     if (ref $inheritances) {
-      foreach my $Inheritance (@$inheritances) {
-#	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
-	$g->add_edge(
-		     $nodes{$Inheritance->Parent}=>$nodes{$Inheritance->Child},
-		     dir=>'1',
-		    );
-      }
+	foreach my $Inheritance (@$inheritances) {
+	    next unless ($nodes{$Inheritance->Parent});
+	    #	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
+	    $g->add_edge(
+			 $nodes{$Inheritance->Parent}=>$nodes{$Inheritance->Child},
+			 dir=>'1',
+			);
+	}
     }
 
-    my $components = $self->Components;
-    if (ref $components) {
-      foreach my $Component (@$components) {
-#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
-	my $node = $Component->Name;
-#	warn "node : $node\n";
-	$nodes{$Component->Id} = $node;
-	$g->add_node($node,label=>$node, shape=>'record');
-      }
+    unless ($config{skip_packages}) {
+	my $components = $self->Components;
+	if (ref $components) {
+	    foreach my $Component (@$components) {
+		#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
+		my $node = $Component->Name;
+		#	warn "node : $node\n";
+		$nodes{$Component->Id} = $node;
+		$g->add_node($node,label=>$node, shape=>'record');
+	    }
+	}
     }
 
     my $dependancies = $self->Dependancies;
     if (ref $dependancies) {
       foreach my $Dependancy (@$dependancies) {
+	  next unless ($nodes{$Dependancy->Parent});
 	  #	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
 	  $g->add_edge( $nodes{$Dependancy->Parent}=>$nodes{$Dependancy->Child}, style=>'dashed',dir=>1);
       }
@@ -647,45 +678,51 @@ sub export_vcg {
     return 0;
   }
 
-  my $superclasses = $self->Superclasses;
+  unless ($config{skip_superclasses}) {
+      my $superclasses = $self->Superclasses;
 
-  if (ref $superclasses) {
-    foreach my $Superclass (@$superclasses) {
-#      warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
-      my $node = $Superclass->Name()."\n----------------\n";
-      $nodes{$Superclass->Id} = $node;
-      $vcg->add_node(title=>$node, label=> $node);
-    }
+      if (ref $superclasses) {
+	  foreach my $Superclass (@$superclasses) {
+	      #      warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
+	      my $node = $Superclass->Name()."\n----------------\n";
+	      $nodes{$Superclass->Id} = $node;
+	      $vcg->add_node(title=>$node, label=> $node);
+	  }
+      }
   }
 
   my $inheritances = $self->Inheritances;
   if (ref $inheritances) {
-    foreach my $Inheritance (@$inheritances) {
-      #	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
-      $vcg->add_edge(
-		     source=>$nodes{$Inheritance->Parent}, target=>$nodes{$Inheritance->Child},
-		    );
-    }
+      foreach my $Inheritance (@$inheritances) {
+	  next unless ($nodes{$Inheritance->Parent});
+	  #	warn "inheritance parent :", $Inheritance->Parent, " child :", $Inheritance->Child, "\n";
+	  $vcg->add_edge(
+			 source=>$nodes{$Inheritance->Parent}, target=>$nodes{$Inheritance->Child},
+			);
+      }
   }
 
-  my $components = $self->Components;
-  if (ref $components) {
-    foreach my $Component (@$components) {
-      #	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
-      my $node = $Component->Name;
-      $nodes{$Component->Id} = $node;
-      $vcg->add_node(label=>$node, title=>$node);
-    }
+  unless ($config{skip_packages}) {
+      my $components = $self->Components;
+      if (ref $components) {
+	  foreach my $Component (@$components) {
+	      #	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
+	      my $node = $Component->Name;
+	      $nodes{$Component->Id} = $node;
+	      $vcg->add_node(label=>$node, title=>$node);
+	  }
+      }
   }
 
   my $dependancies = $self->Dependancies;
   if (ref $dependancies) {
-    foreach my $Dependancy (@$dependancies) {
-      #	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
-      $vcg->add_edge(
-		     source=>$nodes{$Dependancy->Parent}, target=>$nodes{$Dependancy->Child},
-		    );
-    }
+      foreach my $Dependancy (@$dependancies) {
+	  next unless ($nodes{$Dependancy->Parent});
+	  #	warn "dependancy parent ", $Dependancy->Parent, " child :", $Dependancy->Child, "\n";
+	  $vcg->add_edge(
+			 source=>$nodes{$Dependancy->Parent}, target=>$nodes{$Dependancy->Child},
+			);
+      }
   }
 
   open (FILE,">$output_filename") or die "couldn't open $output_filename file for output : $!\n";
@@ -709,7 +746,6 @@ sub export_xml
     my %config          = %{$self->{_config}};
 
     my $output_filename = $config{outputfile};
-    warn "output filename : $output_filename\n";
     my $template_file   = $config{templatefile} || get_template(%config);
 
     if ($config{no_deps})
@@ -730,6 +766,7 @@ sub export_xml
 	    foreach my $argument ( @{$method->{"Param"}} ) {
 		$argument->{Type} = xml_escape($argument->{Type}) if (defined $argument->{Type});
 		$argument->{Name} = xml_escape($argument->{Name});
+		$argument->{Kind} = xml_escape($argument->{Kind}) if (defined $argument->{Kind});
 	    }
 	  }
 	}
@@ -752,7 +789,7 @@ sub export_xml
 			 ABSOLUTE => 1,
 		 }; # cleanup whitespace and allow absolute paths
     my $template = Template->new($template_conf);
-    my $template_variables = { "diagram" => $self, };
+    my $template_variables = { "diagram" => $self, config => $self->{_config}};
 
     my @template_args = ($template_file,$template_variables);
     push (@template_args, $output_filename)
@@ -761,7 +798,6 @@ sub export_xml
     $template->process(@template_args)
 	|| die $template->error();
 
-    print "\n\noutput file is : $output_filename\n" unless ( $config{silent} );
     return 1;
 }
 
@@ -843,6 +879,9 @@ sub _package_add
     $self->{$new_package->Type} = \@packages;
     $new_package->LocalId(scalar @packages);
     $self->{"packages"}{$new_package->Type}{$new_package->Name} = $new_package;
+    if (defined $new_package->Type && defined $new_package->Id) {
+	$self->{"package_types"}{$new_package->Type}{$new_package->Id} = 1;
+    }
 
     return 1;
   }
@@ -1460,11 +1499,11 @@ my @relationships = ();
 
 sub xml_escape {
   my $retval = shift;
-  $retval =~ s/\&/\&amp;/;
+  return '' unless $retval;
 
+  $retval =~ s/\&/\&amp;/;
   $retval =~ s/\'/\&quot;/;
   $retval =~ s/\"/\&quot;/;
-
   $retval =~ s/\</\&lt;/;
   $retval =~ s/\>/\&gt;/;
 
@@ -1474,7 +1513,7 @@ sub xml_escape {
 
 sub get_template {
     my %config = @_;
-    warn "get_template called : outfile -- $config{outputfile}\n";
+#    warn "get_template called : outfile -- $config{outputfile}\n";
     my $template;
  TEMPLATE_SWITCH: {
 	if ($config{outputfile} =~ /\.xmi$/) {
@@ -1483,18 +1522,18 @@ sub get_template {
 	}
 	$template = get_default_template($config{outputfile});
     }				# end of TEMPLATE_SWITCH
-    warn "template : ", $template, "\n";
+#    warn "template : ", $template, "\n";
     # NOTE: $template should always be a ref to a string
     return $template;
 }
 
 sub get_umbrello_template {
     my $outfile = shift;
-    warn "getting umbrello template for $outfile\n";
+    warn "using umbrello template for $outfile\n";
     my $pwd = $ENV{PWD};
     my $template =<<END_UMBRELLO_TEMPLATE;
 <?xml version="1.0" encoding="UTF-8"?>
-<XMI xmlns:UML="org.omg/standards/UML" verified="false" timestamp="" xmi.version="1.2" >
+<XMI xmlns:UML="http://schema.omg.org/spec/UML/1.3" verified="false" timestamp="" xmi.version="1.2" >
  <XMI.header>
   <XMI.documentation>
    <XMI.exporter>umbrello uml modeller http://uml.sf.net</XMI.exporter>
@@ -1504,45 +1543,104 @@ sub get_umbrello_template {
   <XMI.metamodel xmi.name="UML" href="UML.xml" xmi.version="1.3" />
  </XMI.header>
  <XMI.content>
-  <docsettings viewid="2" documentation="" uniqueid="4" />
-  <umlobjects>
+  <UML:Model isSpecification="false" isLeaf="false" isRoot="false" isAbstract="false" >
+   <UML:Namespace.ownedElement>
+<!--
+    <UML:Stereotype isSpecification="false" isLeaf="false" visibility="public" xmi.id="50000" isRoot="false" isAbstract="false" name="Class" />
+    <UML:Stereotype isSpecification="false" isLeaf="false" visibility="public" xmi.id="50001" isRoot="false" isAbstract="false" name="Member_data" />
+    <UML:Stereotype isSpecification="false" isLeaf="false" visibility="public" xmi.id="50002" isRoot="false" isAbstract="false" name="Method" />
+    <UML:Stereotype isSpecification="false" isLeaf="false" visibility="public" xmi.id="50003" isRoot="false" isAbstract="false" name="Parameter" />
++-->
   [%# -------------------------------------------- %]
   [% classes = diagram.Classes %]
+  [% xmictr    = 1 %]
   [% FOREACH class = classes %]
-   <UML:Class stereotype="[% class.Parent %]" package="" xmi.id="[% class.Id %]" abstract="0" documentation="" name="[% class.Name %]" static="0" scope="200">
+   [% xmictr = xmictr + 1 %]
+   <UML:Class stereotype="50000" isSpecification="false" isLeaf="false" visibility="public" xmi.id="[% class.Id %]" isRoot="false" isAbstract="false" name="[% class.Name | html %]" >
+    <UML:Classifier.feature>
+    [% FOREACH at = class.Attributes %]
+    <UML:Attribute isSpecification="false" isLeaf="false" visibility="public" xmi.id="[% at.Id %]" isRoot="false" initialValue="[% at.value %]" type="" isAbstract="false" name="[% at.name | html %]" />
+    [% END %]
+    [% FOREACH op = class.Operations %]
+    <UML:Operation isSpecification="false" isLeaf="false" xmi.id="[% op.Id %]" type="[% op.type | html  %]" isRoot="false" isAbstract="false" name="[% op.name | html  %]" >
+     <UML:BehavioralFeature.parameter>
+      [% FOREACH par = op.Param %]
+      <UML:Parameter isSpecification="false" isLeaf="false" visibility="private" xmi.id="[% par.Id %]" isRoot="false" value="[% par.value %]" type="[% par.type | html  %]" isAbstract="false" name="[% par.name | html %]" />
+       [% END %]
+     </UML:BehavioralFeature.parameter>
+    </UML:Operation>
+    [% END %]
+    </UML:Classifier.feature>
+   </UML:Class>
+   [% END %]
+   [% SET superclasses = diagram.Superclasses %]
+   [% FOREACH superclass = superclasses %]
+   <UML:Class stereotype="50000" isSpecification="false" isLeaf="false" visibility="public"  xmi.id="[% superclass.Id %]" isRoot="false" isAbstract="false" name="[% superclass.Name | html  %]" >
+   </UML:Class>
+   [% END %]
+   [% SET components = diagram.Components %]
+   [% FOREACH component = components %]
+   <UML:Class stereotype="50000" isSpecification="false" isLeaf="false" visibility="public"  xmi.id="[% component.Id %]" isRoot="false" isAbstract="false" name="[% component.Name | html  %]" >
       [% FOREACH at = class.Attributes %]
-      <UML:Attribute stereotype="" package="" xmi.id="[% at.Id %]" value="[% at.value %]" type="[% at.type %]" abstract="0"
-documentation="" name="[% at.name %]" static="0" scope="200" />
+      [% xmictr = xmictr + 1 %]
+      <UML:Attribute stereotype="" package="" xmi.id="[% xmictr %]" value="[% at.value %]" type="[% at.type FILTER html %]" abstract="0"
+documentation="" name="[% at.name FILTER html %]" static="0" scope="200" />
       [% END %]
       [% FOREACH op = class.Operations %]
-      <UML:Operation stereotype="" package="" xmi.id="[% op.Id %]" type="[% op.type %]" abstract="0" documentation="" name="[% op.name %]" static="0" scope="200" >
+      [% xmictr = xmictr + 1 %]
+      <UML:Operation stereotype="" package="" xmi.id="[% xmictr %]" type="[% op.type %]" abstract="0" documentation="" name="[% op.name %]" static="0" scope="200" >
          [% FOREACH par = op.Param %]
-         <UML:Parameter stereotype="" package="" xmi.id="[% par.Id %]" value="[% par.value %]" type="[% par.type %]" abstract="0" documentation="" name="[% par.name %]" static="0" scope="200" />
+         [% xmictr = xmictr + 1 %]
+         <UML:Parameter stereotype="" package="" xmi.id="[% xmictr %]" value="[% par.value %]" type="[% par.type  FILTER html %]" abstract="0" documentation="" name="[% par.Name FILTER html %]" static="0" scope="200" />
          [% END %]
       </UML:Operation>
       [% END %]
    </UML:Class>
-
    [% END %]
-  </umlobjects>
-  <diagrams>
-   <diagram snapgrid="0" showattsig="1" fillcolor="#ffffc0" showgrid="0" showopsig="1" usefillcolor="1" snapx="10" snapy="10" showatts="1" 
-                         xmi.id="2" documentation="" type="402" showops="1" showpackage="0" name="class diagram" localid="30000" 
-                         showstereotype="0" showscope="1" font="Sans,10,-1,5,50,0,0,0,0,0" linecolor="#ff0000" >
+    [% SET inheritances = diagram.Inheritances %]
+    [% FOREACH inheritance = inheritances %]
+      [%- IF inheritance.Parent >0 AND inheritance.Child >0 -%]
+<!--
+    <UML:Association isSpecification="false" visibility="public" xmi.id="9" name="" >
+     <UML:Association.connection>
+      <UML:AssociationEnd isSpecification="false" visibility="public" changeability="changeable" isNavigable="false" xmi.id="[% inheritance.Parent %]" aggregation="none" type="95" name="" />
+      <UML:AssociationEnd isSpecification="false" visibility="public" changeability="changeable" isNavigable="true" xmi.id="[% inheritance.Child %]" aggregation="none" type="407" name="" />
+     </UML:Association.connection>
+    </UML:Association>
+-->
+    <UML:Generalization isSpecification="false" child="[% inheritance.Child %]" visibility="public" xmi.id="[% inheritance.Id %]" parent="[% inheritance.Parent %]" discriminator="" name="" />
+     [%- END %]
+    [% END %]
+    [% SET dependencies = diagram.Dependancies %]
+    [% FOREACH dependency = dependencies %]
+    <UML:Dependency isSpecification="false" visibility="public" xmi.id="[% dependency.Id %]" client="[% dependency.Child %]" name="" supplier="[% dependency.Parent %]" />
+    [% END %]
+   </UML:Namespace.ownedElement>
+  </UML:Model>
+ </XMI.content>
+  <XMI.extensions xmi.extender="umbrello" >
+   <docsettings viewid="2" documentation="" uniqueid="4" />
+   <diagrams>
+    <diagram snapgrid="0" showattsig="1" fillcolor="#ffffc0" linewidth="0" zoom="100" showgrid="0" showopsig="1" usefillcolor="1" snapx="10" canvaswidth="989" snapy="10" showatts="1"
+                         xmi.id="2" documentation="" type="402" showops="1" showpackage="0" name="class diagram" localid="30000"
+                         showstereotype="0" showscope="1" snapcsgrid="0" font="Sans,10,-1,5,50,0,0,0,0,0" linecolor="#ff0000" canvasheight="632" >
+
+
     <widgets>
     [%# -------------------------------------------- %]
     [% classes = diagram.Classes %]
     [% FOREACH class = classes %]
-     <UML:ConceptWidget usesdiagramfillcolour="0" width="[% class.Width %]" showattsigs="601" usesdiagramusefillcolour="0" 
-                        x="[% class.left_x %]" linecolour="#ff0000" y="[% class.top_y %]" showopsigs="601" usesdiagramlinecolour="0" 
-                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showattributes="1" xmi.id="[% class.Id %]" 
+     <classwidget usesdiagramfillcolour="0" width="[% class.Width %]" showattsigs="601" usesdiagramusefillcolour="0"
+                        x="[% class.left_x %]" linecolour="#ff0000" y="[% class.top_y %]" showopsigs="601" linewidth="none" usesdiagramlinewidth="1" usesdiagramlinecolour="0"
+                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showpubliconly="0" showattributes="1" isinstance="0" xmi.id="[% class.Id %]"
                         showoperations="1" showpackage="0" showscope="1" showstereotype="0" font="Sans,10,-1,5,50,0,0,0,0,0" />
     [% END %]
     [% SET superclasses = diagram.Superclasses %]
     [% FOREACH class = superclasses %]
+    [% xmictr = xmictr + 1 %]
      <UML:ConceptWidget usesdiagramfillcolour="0" width="[% class.Width %]" showattsigs="601" usesdiagramusefillcolour="0" 
                         x="[% class.left_x %]" linecolour="#ff0000" y="[% class.top_y %]" showopsigs="601" usesdiagramlinecolour="0" 
-                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showattributes="1" xmi.id="[% class.Id %]" 
+                        fillcolour="#ffffc0" height="[% class.Height %]" usefillcolor="1" showattributes="1" xmi.id="[% xmictr %]" 
                         showoperations="1" showpackage="0" showscope="1" showstereotype="0" font="Sans,10,-1,5,50,0,0,0,0,0" />
 
     [% END %]
@@ -1551,12 +1649,25 @@ documentation="" name="[% at.name %]" static="0" scope="200" />
     <associations>
     [% SET inheritances = diagram.Inheritances %]
     [% FOREACH inheritance = inheritances %]
-     <UML:AssocWidget totalcounta="2" indexa="1" totalcountb="2" indexb="1" widgetbid="[% inheritance.Parent %]" widgetaid="[% inheritance.Child %]" documentation="" type="500" >
+     [%- IF inheritance.Parent >0 AND inheritance.Child >0 -%]
+     <assocwidget totalcounta="2" indexa="1" totalcountb="2" indexb="1" widgetbid="[% inheritance.Parent %]" widgetaid="[% inheritance.Child %]" xmi.id="[% inheritance.Id %]" >
       <linepath>
        <startpoint startx="[% inheritance.left_x %]" starty="[% inheritance.top_y %]" />
        <endpoint endx="[% inheritance.right_x %]" endy="[% inheritance.bottom_y %]" />
       </linepath>
-     </UML:AssocWidget>
+     </assocwidget>
+     [%- END %]
+    [% END %]
+    [% SET dependencies = diagram.Dependancies %]
+    [% FOREACH dependency = dependencies %]
+      [%- IF dependency.Parent >0 AND dependency.Child >0 -%]
+     <assocwidget totalcounta="2" indexa="1" totalcountb="2" indexb="1" widgetbid="[% dependency.Parent %]" widgetaid="[% dependency.Child %]" xmi.id="[% dependency.Id %]" >
+      <linepath>
+       <startpoint startx="[% dependency.left_x %]" starty="[% dependency.top_y %]" />
+       <endpoint endx="[% dependency.right_x %]" endy="[% dependency.bottom_y %]" />
+      </linepath>
+     </assocwidget>
+     [%- END %]
     [% END %]
     </associations>
    </diagram>
@@ -1567,20 +1678,22 @@ documentation="" name="[% at.name %]" static="0" scope="200" />
      <listitem open="0" type="807" id="2" label="class diagram" />
     </listitem>
     <listitem open="1" type="802" id="-1" label="Use Case View" />
+    <listitem open="1" type="821" id="-1" label="Component View" />
+    <listitem open="1" type="827" id="-1" label="Deployment View" />
    </listitem>
   </listview>
- </XMI.content>
+ </XMI.extensions>
 </XMI>
 END_UMBRELLO_TEMPLATE
     return \$template;
 }
 
 sub get_default_template {
-    warn "getting default (dia) template\n";
+    warn "using default (dia) template\n";
     my $template = <<'END_TEMPLATE';
 <?xml version="1.0"?>
 [%# #################################################### %]
-[%# AutoDIAL Template for Dia XML. (c)Copyright 2001 Ajt %]
+[%# Autodia Template for Dia XML. (c)Copyright 2001-2004 %]
 [%# #################################################### %]
 <dia:diagram xmlns:dia="http://www.lysator.liu.se/~alla/dia/">
   <dia:diagramdata>
@@ -1659,11 +1772,11 @@ sub get_default_template {
         <dia:real val="[% class.Height %]"/>
       </dia:attribute>
       <dia:attribute name="name">
-        <dia:string>#[% class.Name %]#</dia:string>
+        <dia:string>#[% class.Name | html  %]#</dia:string>
       </dia:attribute>
       <dia:attribute name="stereotype">
       [% IF class.Parent %]
-        <dia:string>#[% class.Parent %]#</dia:string>
+        <dia:string>#[% class.Parent | html %]#</dia:string>
       [% ELSE %]
         <dia:string/>
       [% END %]
@@ -1695,13 +1808,13 @@ sub get_default_template {
         [% FOREACH at = class.Attributes %]
         <dia:composite type="umlattribute">
           <dia:attribute name="name">
-            <dia:string>#[% at.name %]#</dia:string>
+            <dia:string>#[% at.name FILTER html %]#</dia:string>
           </dia:attribute>
           <dia:attribute name="type">
-            <dia:string>#[% at.type %]#</dia:string>
+            <dia:string>#[% at.type FILTER html %]#</dia:string>
           </dia:attribute>
           <dia:attribute name="value">
-            <dia:string>[% at.value  %]</dia:string>
+            <dia:string>[% at.value | html %]</dia:string>
           </dia:attribute>
           <dia:attribute name="visibility">
             <dia:enum val="[% at.visibility %]"/>
@@ -1723,11 +1836,11 @@ sub get_default_template {
         [% FOREACH op = class.Operations %]
         <dia:composite type="umloperation">
           <dia:attribute name="name">
-            <dia:string>#[% op.name %]#</dia:string>
+            <dia:string>#[% op.name FILTER html %]#</dia:string>
           </dia:attribute>
           <dia:attribute name="type">
 	  [% IF op.type %]
-            <dia:string>#[% op.type %]#</dia:string>
+            <dia:string>#[% op.type  FILTER html %]#</dia:string>
 	  [% ELSE %]
 	     <dia:string/>
 	  [% END %]
@@ -1746,16 +1859,24 @@ sub get_default_template {
             [% FOREACH par = op.Param %] 
             <dia:composite type="umlparameter">
               <dia:attribute name="name">
-                <dia:string>#[% par.Name %]#</dia:string>
+                <dia:string>#[% par.Name FILTER html %]#</dia:string>
               </dia:attribute>
               <dia:attribute name="type">
-                <dia:string>#[% par.Type %]#</dia:string>
+                <dia:string>#[% par.Type FILTER html %]#</dia:string>
               </dia:attribute>
               <dia:attribute name="value">
-                <dia:string/>
+             [% IF par.Value %]
+                <dia:enum val="[% par.Value %]"/>
+             [% ELSE %]
+                 <dia:enum val="0"/>
+              [% END %]
               </dia:attribute>
               <dia:attribute name="kind">
-                <dia:enum val="0"/>
+             [% IF par.Kind %]
+                <dia:enum val="[% par.Kind %]"/>
+             [% ELSE %]
+                 <dia:enum val="0"/>
+              [% END %]
               </dia:attribute>
             </dia:composite>
             [% END %]
@@ -1776,6 +1897,7 @@ sub get_default_template {
     </dia:object>
 [% END %]
 [%#%]
+[% UNLESS config.skip_packages %]
 [% SET components = diagram.Components %]
 [%#%]
 [% FOREACH component = components %]
@@ -1798,7 +1920,7 @@ sub get_default_template {
    <dia:attribute name="text">
      <dia:composite type="text">
        <dia:attribute name="string">
-         <dia:string>#[% component.Name %]#</dia:string>
+         <dia:string>#[% component.Name | html %]#</dia:string>
        </dia:attribute>
        <dia:attribute name="font">
          <dia:font name="Courier"/>
@@ -1856,7 +1978,9 @@ sub get_default_template {
    </dia:connections>
  </dia:object>
 [% END %]
+[% END %]
 [% # %]
+[% UNLESS config.skip_superclasses %]
 [% SET superclasses = diagram.Superclasses %]
 [% # %]
 [% FOREACH superclass = superclasses %]
@@ -1877,7 +2001,7 @@ sub get_default_template {
      <dia:real val="[% superclass.Height %]"/>
    </dia:attribute>
    <dia:attribute name="name">
-     <dia:string>#[% superclass.Name %]#</dia:string>
+     <dia:string>#[% superclass.Name  %]#</dia:string>
    </dia:attribute>
    <dia:attribute name="stereotype">
      <dia:string/>
@@ -1905,9 +2029,14 @@ sub get_default_template {
    <dia:attribute name="templates"/>
  </dia:object>
 [% END %]
+[% END %]
 [% #### %]
-[% SET inheritances = diagram.Inheritances %] 
+[% SET inheritances = diagram.Inheritances %]
 [% FOREACH inheritance = inheritances %]
+ [% IF config.skip_superclasses %]
+   [% SET parent = inheritance.Parent %]
+   [% UNLESS diagram.package_types.class.$parent %] [% NEXT %] [% END %]
+ [% END %]
  <dia:object type="UML - Generalization" version="0" id="O[% inheritance.Id  %]">
    <dia:attribute name="obj_pos">
      <dia:point val="[% inheritance.Orth_Top_Left %]"/>

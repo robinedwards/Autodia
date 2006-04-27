@@ -3,17 +3,15 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME'		=> 'Autodia',
-    'VERSION_FROM'	=> 'Autodia.pm', # finds $VERSION
+    'VERSION_FROM'	=> 'lib/Autodia.pm', # finds $VERSION
     'PREREQ_PM'		=> {
-				Inline       => 0, 
-				Inline::Java => 0,
 				Getopt::Std  => 0,
 				Data::Dumper => 0,
 				File::Find   => 0,
 				Template     => 1,
-				GraphViz     => 0,
-				SpringGraph  => 0.02,
-				VCG	     => 0.4,
+				# GraphViz     => 0, # optional
+				# SpringGraph  => 0.02, # optional
+				# VCG	     => 0.4, # optional
 				XML::Simple  => 0,
 			    }, 
     'EXE_FILES' => [ 'autodia.pl', 'autodia_java.pl' ],
