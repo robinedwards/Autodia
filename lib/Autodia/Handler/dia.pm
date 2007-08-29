@@ -1,15 +1,39 @@
-################################################################
-# AutoDIA - Automatic Dia XML.   (C)Copyright 2003 A Trevena   #
-#                                                              #
-# AutoDIA comes with ABSOLUTELY NO WARRANTY; see COPYING file  #
-# This is free software, and you are welcome to redistribute   #
-# it under certain conditions; see COPYING file for details    #
-################################################################
 package Autodia::Handler::dia;
-
 require Exporter;
-
 use strict;
+
+=head1 NAME
+
+Autodia::Handler::dia - AutoDia handler for dia
+
+=head1 DESCRIPTION
+
+This provides Autodia with the ability to read dia files, allowing you to convert them via the Diagram Export methods to images (using GraphViz and VCG) or html/xml using custom templates.
+
+The dia handler will parse dia xml files using XML::Simple and populating the diagram object with class, superclass and package objects.
+
+the dia handler is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
+
+=head1 SYNOPSIS
+
+use Autodia::Handler::dia;
+
+my $handler = Autodia::Handler::dia->New(\%Config);
+
+$handler->Parse(filename); # where filename includes full or relative path.
+
+=head2 CONSTRUCTION METHOD
+
+my $handler = Autodia::Handler::dia->New(\%Config);
+This creates a new handler using the Configuration hash to provide rules selected at the command line.
+
+=head2 ACCESS METHODS
+
+$handler->Parse(filename); # where filename includes full or relative path.
+
+This parses the named file and returns 1 if successful or 0 if the file could not be opened.
+
+=cut
 
 use vars qw($VERSION @ISA @EXPORT);
 use Autodia::Handler;
@@ -194,49 +218,31 @@ sub get_attributes {
   return $return;
 }
 
-1;
 
 ###############################################################################
 
-=head1 NAME
+=head1 SEE ALSO
 
-Autodia::Handler::dia.pm - AutoDia handler for dia
+Autodia::Handler
 
-=head1 INTRODUCTION
+Autodia::Diagram
 
-This provides Autodia with the ability to read dia files, allowing you to convert them via the Diagram Export methods to images (using GraphViz and VCG) or html/xml using custom templates.
+=head1 AUTHOR
 
-=head1 Description
+Aaron Trevena, E<lt>aaron.trevena@gmail.comE<gt>
 
-The dia handler will parse dia xml files using XML::Simple and populating the diagram object with class, superclass and package objects.
+=head1 COPYRIGHT AND LICENSE
 
-the dia handler is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
+Copyright (C) 2001-2007 by Aaron Trevena
 
-=head1 SYNOPSIS
-
-=item use Autodia::Handler::dia;
-
-=item my $handler = Autodia::Handler::dia->New(\%Config);
-
-=item $handler->Parse(filename); # where filename includes full or relative path.
-
-=head2 CONSTRUCTION METHOD
-
-use Autodia::Handler::dia;
-
-my $handler = Autodia::Handler::dia->New(\%Config);
-This creates a new handler using the Configuration hash to provide rules selected at the command line.
-
-=head2 ACCESS METHODS
-
-$handler->Parse(filename); # where filename includes full or relative path.
-
-This parses the named file and returns 1 if successful or 0 if the file could not be opened.
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.1 or,
+at your option, any later version of Perl 5 you may have available.
 
 =cut
 
 
-
+1;
 
 
 

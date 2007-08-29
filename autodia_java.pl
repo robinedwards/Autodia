@@ -254,9 +254,11 @@ AutoDia requires Template Toolkit and Perl 5. Some handlers and templates may re
 
 AutoDia can use GraphViz to generate layout coordinates, and can produce di-graphs (notation for directional graphs) in dot (plain or canonical) and vcg, as well as Dia xml.
 
-Helpful information, links and news can be found at the autodia website - http://droogs.org/autodia/
+Helpful information, links and news can be found at the autodia website - http://www.aarontrevena.co.uk/opensource/autodia/
 
 =head1 USAGE
+
+=over 4
 
 =item C<autodia.pl ([-i filename [-p path] ] or [-d directory [-r] ]) [options]>
 
@@ -305,6 +307,8 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -h                     : display this help message>
 
 =item C<autodia.pl -V                     : display version and copyright message>
+
+=back
 
 =cut
 

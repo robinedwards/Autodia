@@ -1,15 +1,22 @@
-################################################################
-# AutoDIA - Automatic Dia XML.   (C)Copyright 2001 A Trevena   #
-#                                                              #
-# AutoDIA comes with ABSOLUTELY NO WARRANTY; see COPYING file  #
-# This is free software, and you are welcome to redistribute   #
-# it under certain conditions; see COPYING file for details    #
-################################################################
 package Autodia::Handler::Perl;
-
 require Exporter;
-
 use strict;
+
+=head1 NAME
+
+Autodia::Handler::Perl.pm - AutoDia handler for perl
+
+=head1 DESCRIPTION
+
+HandlerPerl parses files into a Diagram Object, which all handlers use. The role of the handler is to parse through the file extracting information such as Class names, attributes, methods and properties.
+
+HandlerPerl parses files using simple perl rules. A possible alternative would be to write HandlerCPerl to handle C style perl or HandleHairyPerl to handle hairy perl.
+
+HandlerPerl is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
+
+%language_handlers = { .. , perl => "perlHandler", .. };
+
+=cut
 
 use Data::Dumper;
 
@@ -20,12 +27,27 @@ use Autodia::Handler;
 
 use Autodia::Diagram;
 
-#---------------------------------------------------------------
+=head1 METHODS
 
-#####################
-# Constructor / Class Methods
+=head2 CONSTRUCTION METHOD
 
-# new inherited from Autodia::Handler
+use Autodia::Handler::Perl;
+
+my $handler = Autodia::Handler::Perl->New(\%Config);
+
+This creates a new handler using the Configuration hash to provide rules selected at the command line.
+
+=head2 ACCESSOR METHODS
+
+$handler->Parse(filename); # where filename includes full or relative path.
+
+This parses the named file and returns 1 if successful or 0 if the file could not be opened.
+
+$handler->output(); # any arguments are ignored.
+
+This outputs the Dia XML file according to the rules in the %Config hash passed at initialisation of the object.
+
+=cut
 
 sub find_files_by_packagename {
     my $config = shift;
@@ -420,10 +442,11 @@ sub _parse {
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
 
+	    $subname =~ s/^(.*?)['"]\..*$/${1}_xxxx/;
+
 	    my %subroutine = ( "name" => $subname, );
 	    $subroutine{"visibility"} = ($subroutine{"name"} =~ m/^\_/) ? 1 : 0;
 	    $subroutine{"Id"} = $Diagram->_object_count();
-
 	    # NOTE : perl doesn't provide named parameters
 	    # if we wanted to be clever we could count the parameters
 	    # see Autodia::Handler::PHP for an example of parameter handling
@@ -434,6 +457,8 @@ sub _parse {
 	# if line contains object attributes parse add to class
 	if ($line =~ m/\$(class|self|this)\-\>\{['"]*(.*?)["']*}/) {
 	    my $attribute_name = $2;
+	    $attribute_name =~ s/^(.*?)['"]\..*$/${1}_xxxx/;
+	    $attribute_name =~ s/['"\}\{\]\[]//g; # remove nasty badness
 	    my $attribute_visibility = ( $attribute_name =~ m/^\_/ ) ? 1 : 0;
 
 	    $Class->add_attribute({
@@ -443,13 +468,6 @@ sub _parse {
 				  }) unless ($attribute_name =~ /^\$/);
 	}
 
-	# add this block once can handle being entering & exiting subs:
-	# if line contains possible args to method add them to method
-	#	if (($line =~ m/^\([\w\s]+\)\s*\=\s*\@\_\;\s*$/) && ())
-	#	  {
-	#	    print "should be adding these arguments to sub : $1\n";
-	#	  }
-	
     }
 
     $self->{Diagram} = $Diagram;
@@ -521,47 +539,29 @@ sub _is_package
   }
 
 
-
-####-----
-
-1;
-
 ###############################################################################
 
-=head1 NAME 
+=head1 SEE ALSO
 
-Autodia::Handler::Perl.pm - AutoDia handler for perl
+Autodia::Handler
 
-=head1 INTRODUCTION
+Autodia::Diagram
 
-HandlerPerl parses files into a Diagram Object, which all handlers use. The role of the handler is to parse through the file extracting information such as Class names, attributes, methods and properties.
+=head1 AUTHOR
 
-HandlerPerl parses files using simple perl rules. A possible alternative would be to write HandlerCPerl to handle C style perl or HandleHairyPerl to handle hairy perl.
+Aaron Trevena, E<lt>aaron.trevena@gmail.comE<gt>
 
-HandlerPerl is registered in the Autodia.pm module, which contains a hash of language names and the name of their respective language - in this case:
+=head1 COPYRIGHT AND LICENSE
 
-%language_handlers = { .. , perl => "perlHandler", .. };
+Copyright (C) 2001-2007 by Aaron Trevena
 
-=head1 CONSTRUCTION METHOD
-
-use Autodia::Handler::Perl;
-
-my $handler = Autodia::Handler::Perl->New(\%Config);
-
-This creates a new handler using the Configuration hash to provide rules selected at the command line.
-
-=head1 ACCESS METHODS
-
-$handler->Parse(filename); # where filename includes full or relative path.
-
-This parses the named file and returns 1 if successful or 0 if the file could not be opened.
-
-$handler->output(); # any arguments are ignored.
-
-This outputs the Dia XML file according to the rules in the %Config hash passed at initialisation of the object.
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.1 or,
+at your option, any later version of Perl 5 you may have available.
 
 =cut
 
+1;
 
 
 

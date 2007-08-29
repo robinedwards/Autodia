@@ -1,13 +1,21 @@
-################################################################
-# AutoDIAL - Automatic Dia XML.   (C)Copyright 2001 A Trevena  #
-#                                                              #
-# AutoDIAL comes with ABSOLUTELY NO WARRANTY; see COPYING file #
-# This is free software, and you are welcome to redistribute   #
-# it under certain conditions; see COPYING file for details    #
-################################################################
 package Autodia::Diagram::Class;
-
 use strict;
+
+=head1 NAME
+
+DiagramClass - Class that holds, updates and outputs the values of a diagram element of type class.
+
+=head1 SYNOPSIS
+
+use DiagramClass;
+
+my $Class = DiagramClass->new;
+
+=head2 Description
+
+DiagramClass is an object that represents the Dia UML Class element within a Dia diagram. It holds, outputs and allows the addition of attributes, relationships and methods.
+
+=cut
 
 use vars qw($VERSION @ISA @EXPORT);
 require Exporter;
@@ -17,7 +25,33 @@ use Data::Dumper;
 
 @ISA = qw(Autodia::Diagram::Object Exporter);
 
-#------------------------------------------------------------------------
+=head1 METHODS
+
+=head2 Constructor
+
+my $Class = DiagramClass->new($name);
+
+creates and returns a simple DiagramClass object, containing its name and its original position (default 0,0).
+
+=head2 Accessors
+
+DiagramClass attributes are accessed through methods, rather than directly. Each attribute is available through calling the method of its name, ie Inheritances(). The methods available are : 
+
+Operations, Attributes, Inheritances, Dependancies, Parent, and has_child. The first 4 return a list, the later return a string.
+
+Adding elements to the DiagramClass is acheived through the add_<attribute> methods, ie add_inheritance().
+
+Rather than remove an element from the diagram it is marked as redundant and replaced with a superceding element, as DiagramClass has highest precedence it won't be superceded and so doesn't have a redundant() method. Superclass and Component do.
+
+=head2 Accessing and manipulating the DiagramClass
+
+$DiagramClass->Attributes(), Inheritances(), Operations(), and Dependancies() all return a list of their respective elements.
+
+$DiagramClass->Parent(), and has_child() return the value of the parent or child respectively if present otherwise a false.
+
+$Diagram->add_attribute(), add_inheritance(), add_operation(), and add_dependancy() all add a new element of their respective types.
+
+=cut
 
 #####################
 # Constructor Methods
@@ -267,55 +301,27 @@ sub _update
 ##############################################################################
 
 
-=head1 NAME
-
-DiagramClass - Class that holds, updates and outputs the values of a diagram element of type class.
-
-=head1 SYNOPSIS
-
-use DiagramClass;
-
-=item class methods
-
-$Class = DiagramClass->new;
-
-=item object data methods
-
-# get versions #
-
-DiagramClass attributes are accessed through methods, rather than directly. Each attribute is available through calling the method of its name, ie Inheritances(). The methods available are : 
-
-Operations, Attributes, Inheritances, Dependancies, Parent, and has_child. The first 4 return a list, the later return a string.
-
-# add versions #
-
-Adding elements to the DiagramClass is acheived through the add_<attribute> methods, ie add_inheritance().
-
-# remove versions #
-
-Rather than remove an element from the diagram it is marked as redundant and replaced with a superceding element, as DiagramClass has highest precedence it won't be superceded and so doesn't have a redundant() method. Superclass and Component do.
-
-=head2 Description
-
-DiagramClass is an object that represents the Dia UML Class element within a Dia diagram. It holds, outputs and allows the addition of attributes, relationships and methods.
-
-=head2 Creating a new DiagramClass object
-
-=item new($name)
-
-creates and returns a simple DiagramClass object, containing its name and its original position (default 0,0).
-
-=head2 Accessing and manipulating the DiagramClass
-
-$DiagramClass->Attributes(), Inheritances(), Operations(), and Dependancies() all return a list of their respective elements.
-
-$DiagramClass->Parent(), and has_child() return the value of the parent or child respectively if present otherwise a false.
-
-$Diagram->add_attribute(), add_inheritance(), add_operation(), and add_dependancy() all add a new element of their respective types.
-
 =head2 See Also
 
-DiagramObject Diagram DiagramSuperclass DiagramComponent DiagramInheritance DiagramDependancy
+L<Autodia::DiagramObject>
+
+L<Autodia::Diagram>
+
+L<Autodia::DiagramSuperclass>
+
+L<Autodia::DiagramInheritance>
+
+=head1 AUTHOR
+
+Aaron Trevena, E<lt>aaron.trevena@gmail.comE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2004 by Aaron Trevena
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.1 or,
+at your option, any later version of Perl 5 you may have available.
 
 =cut
 

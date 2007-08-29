@@ -1,6 +1,15 @@
 Changes to AutoDia
 ------------------
 
+version 2.04 29/8/2007
+- escapes nasty badness in perl attribute names found in code
+- replaces dynamic parts of method or attribute names in perl code with _xxxx
+- added pod.t and pod_coverage.t
+- fixed pod errors
+- fixed old email and website addresses
+- added csharp mode written by Sean Dague
+- added -s skiplist argument to ignore packages matching patterns
+
 version 2.03 27/04/2006
 - basic Class::DBI support in perl handler
 - updated Umbrello

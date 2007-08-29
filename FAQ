@@ -1,7 +1,7 @@
 The AutoDIAL FAQ
 
 An uptodate copy of this document can be
-found at http://droogs.org/autodia/faq/
+found at http://www.aarontrevena.co.uk/opensource/autodia/faq.txt
 
 Q: Why is autodia. not processing my file
 A: Have you used the -i option, if not try 
@@ -53,4 +53,4 @@ Q: Why is AutoDia so rubbish.
 A: Because Trelane told me to 'just release it'.
 
 Any corrections or contributions to the faq should be mailed to me at
-ajt@droogs.org
+aaron.trevena@gmail.com

@@ -35,7 +35,7 @@ Functionality should be added through extending the current model and/or adding 
 componentisation. I have spent a long time ironing out the hacks and bugs and won't put any back in in a hurry.
 
 If you wish to add functionality then email me a patch, the source and an explaination, if you wish to request a feature also email
-me. I can be reached at ajt@droogs.org .
+me. I can be reached at aaron.trevena@gmail.com 
 
 
 WHY I DID IT THIS WAY
@@ -143,5 +143,5 @@ version 0.01:
 
 ######################################################################
 
-Please submit bug reports, code, examples, test code, etc to ajt@droogs.org , see
-http://droogs.org/autodia/ for details and news.
+Please submit bug reports, code, examples, test code, etc to aaron.trevena@gmail.com , see
+http://www.aarontrevena.co.uk/opensource/autodia/ for details and news.

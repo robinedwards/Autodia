@@ -22,7 +22,7 @@ my %language_handlers = %$language_handlers;
 
 # get configuration from command line
 my %args=();
-getopts("KkFCsSDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
+getopts("KkFCs:SDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
 my %config = %{get_config(\@ARGV,\%args)};
 
 print "\n\nAutoDia - version ".$Autodia::VERSION."(c) Copyright 2003 A Trevena\n\n" unless ( $config{silent} );
@@ -108,6 +108,16 @@ sub get_config {
     Autodia->setConfig(\%config);
 
     my %file_extensions = %{Autodia->getPattern()};
+
+    if ($args{'s'}) {
+      $config{skipfile} = $args{'s'};
+      warn "using skipfile : $config{skipfile}\n";
+      unless (-f $config{skipfile}) { die "couldn't use $config{skipfile} : $!\n"; }
+      open(SKIPFILE, "<$config{skipfile}") or die "couldn't use $config{skipfile} : $!\n";
+      $config{skip_patterns} = [ map (eval { s/[\s\n]+//g; $_ }, <SKIPFILE>) ];
+      close SKIPFILE;
+      warn Dumper $config{skip_patterns};
+    }
 
     my $inputpath = "";
     if (defined $args{'p'}) {
@@ -202,6 +212,7 @@ sub get_config {
 	    exit;
 	}
     }
+
     $config{filenames}    = \@filenames;
     $config{use_stdout}   = (defined $args{'O'}) ? 1 : 0;
     $config{templatefile} = (defined $args{'t'}) ? $args{'t'} : undef;
@@ -237,6 +248,7 @@ autodia.pl -D                     : ignore dependancies (ie do not process or di
 autodia.pl -K                     : process dependance but do not display in output
 autodia.pl -k                     : process inheritance but do not display in output
 autodia.pl -S                     : silent mode, no output to stdout except with -O
+autodia.pl -s skipfile            : exclude files or packagenames matching those listed in file
 autodia.pl -H                     : show only public/visible methods and attributes
 autodia.pl -m                     : show only Class methods
 autodia.pl -M                     : do not show Class Methods
@@ -265,9 +277,11 @@ AutoDia requires Template Toolkit and Perl 5. Some handlers and templates may re
 
 AutoDia can use GraphViz to generate layout coordinates, and can produce di-graphs (notation for directional graphs) in dot (plain or canonical) and vcg, as well as Dia xml.
 
-Helpful information, links and news can be found at the autodia website - http://droogs.org/autodia/
+Helpful information, links and news can be found at the autodia website -  http://www.aarontrevena.co.uk/opensource/autodia/
 
 =head1 USAGE
+
+=over 4
 
 =item C<autodia.pl ([-i filename [-p path] ] or [-d directory [-r] ]) [options]>
 
@@ -302,6 +316,8 @@ Helpful information, links and news can be found at the autodia website - http:/
 
 =item C<autodia.pl -v                     : output via VCG >
 
+=item C<autodia.pl -s skipfile            : exclude files or packagenames matching those listed in file>
+
 =item c<autodia.pl -D                     : ignore dependancies (ie do not process or display dependancies)>
 
 =item C<autodia.pl -K                     : do not display packages that are not part of input>
@@ -323,6 +339,8 @@ Helpful information, links and news can be found at the autodia website - http:/
 =item C<autodia.pl -h                     : display this help message>
 
 =item C<autodia.pl -V                     : display version and copyright message>
+
+=back
 
 =cut
 

@@ -1,13 +1,21 @@
-################################################################
-# Autodia - Automatic Dia XML.   (C)Copyright 2001 A Trevena   #
-#                                                              #
-# AutoDia comes with ABSOLUTELY NO WARRANTY; see COPYING file  #
-# This is free software, and you are welcome to redistribute   #
-# it under certain conditions; see COPYING file for details    #
-################################################################
 package Autodia::Diagram;
-
 use strict;
+
+=head1 NAME
+
+Autodia::Diagram - Class to hold a collection of objects representing parts of a Dia Diagram.
+
+=head1 SYNOPSIS
+
+use Autodia::Diagram;
+
+my $Diagram = Autodia::Diagram->new;
+
+=head2 Description
+
+Diagram is an object that contains a collection of diagram elements and the logic to generate the diagram layout as well as to output the diagram itself in Dia's XML format using template toolkit.
+
+=cut
 
 use Template;
 use Data::Dumper;
@@ -41,6 +49,21 @@ my %vcg_filetypes = (
 #----------------------------------------------------------------
 # Constructor Methods
 
+
+=head1 METHODS
+
+=head2 Class Methods
+
+=over 4
+
+=item new - constructor method
+
+creates and returns an unpopulated diagram object.
+
+=back
+
+=cut
+
 sub new
 {
   my $class = shift;
@@ -52,9 +75,25 @@ sub new
   return $Diagram;
 }
 
-#
-#----------------------------------------------------------------
-#
+=head2 Object methods
+
+To get a collection of a objects of a certain type you use the method of the same name. ie $Diagram->Classes() returns an array of 'class' objects.
+
+The methods available are Classes(), Components(), Superclasses(), Inheritances(), and Dependancies(); These are all called in the template to get the collections of objects to loop through.
+
+To add an object to the diagram. You call the add_<object type> method, for example $Diagram->add_class($class_name), passing the name of the object in the case of Class, Superclass and Component but not Inheritance or Dependancy which have their names generated automagically.
+
+Objects are not removed, they can only be superceded by another object; Component can be superceded by Superclass which can superceded by Class. This is handled by the object itself rather than the diagram.
+
+=head2 Accessing and manipulating the Diagram
+
+Elements are added to the Diagram through the add_<elementname> method (ie add_classes() ).
+
+Collections of elements are retrieved through the <elementname> method (ie Classes() ).
+
+The diagram is laid out and output to a file using the export_xml() method.
+
+=cut
 
 ################
 # Access Methods
@@ -376,6 +415,8 @@ sub export_graphviz
     if (ref $classes) { 
       foreach my $Class (@$classes) {
 
+	next if ($self->skip($Class));
+
 	my $node = '{'.$Class->Name."|";
 
 	if ($config{methods}) {
@@ -432,6 +473,7 @@ sub export_graphviz
 	my $superclasses = $self->Superclasses;
 	if (ref $superclasses) {
 	    foreach my $Superclass (@$superclasses) {
+	      next if ($self->skip($Superclass));
 		#	warn "superclass name :", $Superclass->Name, " id :", $Superclass->Id, "\n";
 		my $node = $Superclass->Name;
 		$node=~ s/[\{\}]//g;
@@ -458,6 +500,7 @@ sub export_graphviz
 	my $components = $self->Components;
 	if (ref $components) {
 	    foreach my $Component (@$components) {
+	      next if ($self->skip($Component));
 		#	warn "component name :", $Component->Name, " id :", $Component->Id, "\n";
 		my $node = '{'.$Component->Name.'}';
 		#	warn "node : $node\n";
@@ -492,6 +535,24 @@ sub Warn {
     my ($self,$warning) = @_;
     warn "warning : $warning\n";
     return;
+}
+
+sub skip {
+  my ($self,$object) = @_;
+  my $skip = 0;
+  my $skip_list = $self->{_config}{skip_patterns};
+  if (ref $skip_list) {
+    my $object_name = $object->Name;
+    foreach my $pattern (@$skip_list) {
+      chomp($pattern);
+      if ($object_name =~ m/$pattern/) {
+	warn "skipping $object_name : matches $pattern\n" unless ($self->{_config}{silent});
+	$skip = 1;
+	last;
+      }
+    }
+  }
+  return $skip;
 }
 
 ########################################################
@@ -2078,55 +2139,6 @@ END_TEMPLATE
 
 ##################################################################
 
-=head1 NAME
-
-Autodia::Diagram - Class to hold a collection of objects representing parts of a Dia Diagram.
-
-=head1 SYNOPSIS
-
-use Autodia::Diagram;
-
-=item class methods
-
-$Diagram = Autodia::Diagram->new;
-
-=item object data methods
-
-# get versions #
-
-To get a collection of a objects of a certain type you use the method of the same name. ie $Diagram->Classes() returns an array of 'class' objects.
-
-The methods available are Classes(), Components(), Superclasses(), Inheritances(), and Dependancies(); These are all called in the template to get the collections of objects to loop through.
-
-
-# add versions #
-
-To add an object to the diagram. You call the add_<object type> method, for example $Diagram->add_class($class_name), passing the name of the object in the case of Class, Superclass and Component but not Inheritance or Dependancy which have their names generated automagically.
-
-
-# remove versions #
-
-Objects are not removed, they can only be superceded by another object; Component can be superceded by Superclass which can superceded by Class. This is handled by the object itself rather than the diagram.
-
-=head2 Description
-
-Diagram is an object that contains a collection of diagram elements and the logic to generate the diagram layout as well as to output the diagram itself in Dia's XML format using template toolkit.
-
-=head2 Creating a new Diagram object
-
-=item new()
-
-creates and returns an unpopulated diagram object.
-
-=head2 Accessing and manipulating the Diagram
-
-Elements are added to the Diagram through the add_<elementname> method (ie add_classes() ).
-
-Collections of elements are retrieved through the <elementname> method (ie Classes() ).
-
-The diagram is laid out and output to a file using the export_xml() method.
-
-
 =head2 See Also
 
 Autodia
@@ -2142,6 +2154,19 @@ Autodia::Diagram::Component
 Autodia::Diagram::Inheritance
 
 Autodia::Diagram::Dependancy
+
+=head1 AUTHOR
+
+Aaron Trevena, E<lt>aaron.trevena@gmail.comE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2004 by Aaron Trevena
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.1 or,
+at your option, any later version of Perl 5 you may have available.
+
 
 =cut
 

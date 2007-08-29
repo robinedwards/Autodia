@@ -27,7 +27,7 @@ STATUS
 
 AutoDia currently works on most perl applications, it seems to work on
 CGI.pm, itself, various projects of my own and friends. If it doesn't work
-on something, please email ajt@droogs.org the error message and any extra
+on something, please email aaron.trevena@gmail.com the error message and any extra
 information or fixes you have.
 
 AutoDia now supports any language that has a handler registered in
@@ -44,13 +44,13 @@ if files are corrupted or contain errors.
 COPYRIGHT AND LICENSE
 ---------------------
 
-AutoDia is Copyright (c) 2001 Aaron Trevena <ajt@droogs.org>
+AutoDia is Copyright (c) 2001 Aaron Trevena <aaron.trevena@gmail.com>
 Licensed under the GNU General Public License (GPL, see file COPYING).
 
 CONTACT
 -------
 
-email me at ajt@droogs.org, and put "[AutoDia]" in the subject line. 
+email me at aaron.trevena@gmail.com, and put "[AutoDia]" in the subject line. 
 
 DOCUMENTATION
 -------------
@@ -77,7 +77,7 @@ To contribute to AutoDia mail me at the below address.
 
 --
 
-Aaron Trevena <ajt@droogs.org>
+Aaron Trevena aaron.trevena@gmail.com
 Author and maintainer.
 
 

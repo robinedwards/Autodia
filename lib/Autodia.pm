@@ -1,21 +1,77 @@
-###############################################################
-# AutoDIA - Automatic Dia XML.   (C)Copyright 2001 A Trevena  #
-#                                                             #
-# AutoDIA comes with ABSOLUTELY NO WARRANTY; see COPYING file #
-# This is free software, and you are welcome to redistribute  #
-# it under certain conditions; see COPYING file for details   #
-###############################################################
-
 package Autodia;
-
 use strict;
+
+=head1 NAME
+
+Autodia.pm - The configuration and Utility perl module for AutoDia.
+
+=head1 DESCRIPTION
+
+AutoDia takes source files as input and using a handler parses them to create documentation through templates. The handlers allow AutoDia to parse any language by providing 
+a handler and registering in in autodia.pm. The templates allow the output to be heavily customised from Dia XML to simple HTML and seperates the logic of the application 
+from the presentation of the results.
+
+AutoDia is written in perl and defaults to the perl handler and file extension matching unless a language is specified using the -l switch.
+
+AutoDia requires Template Toolkit and Perl 5. Some handlers and templates may require additional software, for example the Java SDK for the java handler.
+
+Helpful information, links and news can be found at the autodia website - http://www.aarontrevena.co.uk/opensource/autodia/
+
+=head1 METHODS
+
+=over 4
+
+=item getHandlers
+=item getPattern
+=item setConfig
+
+=back
+
+=head1 Configuring AutoDia via Autodia.pm
+
+To add handlers or languages edit this file.
+
+=over 4
+
+=item To add a handler/parser
+
+Add the language or name of the parser and the name of the module to the %handlers hash in the getHandlers function.
+
+for example :
+
+"perl"      => 'HandlerPerl',
+
+Documentation on writing your own handler can be found in the HandlerPerl and Handler perl modules
+
+=item To add a new language or file extension or file matching patter
+
+Add the name of the pattern and a hashreference to its properties to %patterns in the get_patterns function.
+
+for example :
+
+"perl" => \%perl,
+
+Create a hash of its properties that will be pointed to by the above hashref
+
+for example :
+
+my %perl = (
+              regex     => '\w+\.p[ml]$',
+              wildcards => [
+                            "pl", "pm",
+                           ],
+             );
+
+=back
+
+=cut
 
 ###############################################################
 
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "2.03";
+        $VERSION = "2.04";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers
@@ -37,6 +93,7 @@ sub getHandlers
     my %handlers = (
 		    "perl"      => 'Autodia::Handler::Perl',
 		    'c++'       => 'Autodia::Handler::Cpp',
+		    "csharp" => 'Autodia::Handler::CSharp',
 		    "cpp"	=> 'Autodia::Handler::Cpp',
 		    "java"      => 'Autodia::Handler::Java',
 		    "php"	=> 'Autodia::Handler::PHP',
@@ -77,6 +134,14 @@ sub getPattern
 			   ],
 	     );
 
+  my %csharp  = (
+	      regex     => '\w+\.(cs)$',
+	      wildcards => [
+			    "cs"
+			   ],
+	     );
+
+
    my %java = (
 	       regex     => '\w+\.(java|class)$',
 	       wildcards => [
@@ -106,6 +171,7 @@ sub getPattern
 		  "perl" => \%perl,
 		  'c++'  => \%cpp,
 		  "cpp"  => \%cpp,
+		  "csharp"  => \%csharp,
 		  "java" => \%java,
 		  "php"  => \%php,
 		  "dbi"  => {},
@@ -119,63 +185,14 @@ sub getPattern
   return \%{$patterns{$language}};
 }
 
-1;
 
 ###############################################################
-
-=head1 NAME
-
-Autodia.pm - The configuration and Utility perl module for AutoDia.
-
-=head1 INTRODUCTION
-
-AutoDia takes source files as input and using a handler parses them to create documentation through templates. The handlers allow AutoDia to parse any language by providing 
-a handler and registering in in autodia.pm. The templates allow the output to be heavily customised from Dia XML to simple HTML and seperates the logic of the application 
-from the presentation of the results.
-
-AutoDia is written in perl and defaults to the perl handler and file extension matching unless a language is specified using the -l switch.
-
-AutoDia requires Template Toolkit and Perl 5. Some handlers and templates may require additional software, for example the Java SDK for the java handler.
-
-Helpful information, links and news can be found at the autodia website - http://droogs.org/autodia/
-
-=head1 Configuring AutoDia via Autodia.pm
-
-To add handlers or languages edit this file.
-
-=item To add a handler/parser
-
-Add the language or name of the parser and the name of the module to the %handlers hash in the getHandlers function.
-
-for example :
-
-"perl"      => 'HandlerPerl',
-
-Documentation on writing your own handler can be found in the HandlerPerl and Handler perl modules
-
-=item To add a new language or file extension or file matching patter
-
-Add the name of the pattern and a hashreference to its properties to %patterns in the get_patterns function.
-
-for example :
-
-"perl" => \%perl,
-
-Create a hash of its properties that will be pointed to by the above hashref
-
-for example :
-
-my %perl = (
-              regex     => '\w+\.p[ml]$',
-              wildcards => [
-                            "pl", "pm",
-                           ],
-             );
-
 
 =head1 USAGE
 
 use the autodia.pl script to run autodia.
+
+=over 4
 
 =item autodia.pl ([-i filename [-p path] ] or [-d directory [-r] ]) [options]
 
@@ -205,5 +222,21 @@ use the autodia.pl script to run autodia.
 
 =item autodia.pl -h                     : display this help message
 
+=back
+
+=head1 AUTHOR
+
+Aaron Trevena, E<lt>aaron.trevena@gmail.comE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2001 - 2007 by Aaron Trevena
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.1 or,
+at your option, any later version of Perl 5 you may have available.
+
 =cut
 
+
+1;
