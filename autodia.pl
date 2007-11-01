@@ -164,6 +164,7 @@ sub get_config {
       if (defined $args{'d'}) {
 	print "using directory : " , $args{'d'}, "\n" unless ( $config{silent} );
 	my @dirs = split(" ",$args{'d'});
+	$config{'directory'} = \@dirs;
 	if (defined $args{'r'}) {
 	  print "recursively searching files..\n" unless ( $config{silent} );
 	  find ( { wanted => sub {
@@ -176,7 +177,10 @@ sub get_config {
 		   preprocess => sub {
 		     my @return;
 		     foreach (@_) {
-		       push(@return,$_) unless (m/^.*\/?(CVS|RCS)$/ && $config{skipcvs});
+		       my $skip = 0;
+		       $skip = 1 if  (m/^.*\/?(CVS|RCS)$/ && $config{skipcvs});
+		       $skip = 1 if  (m/^.*\/?(blib)$/);
+		       push(@return,$_) unless ($skip);
 		     }
 		     return @return;
 		   },

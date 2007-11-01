@@ -848,6 +848,7 @@ sub export_xml
 			 # INTERPOLATE =>1, # debug
 			 # LOAD_PERL => 1,  # debug
 			 ABSOLUTE => 1,
+			 OUTPUT_PATH => '.',
 		 }; # cleanup whitespace and allow absolute paths
     my $template = Template->new($template_conf);
     my $template_variables = { "diagram" => $self, config => $self->{_config}};
@@ -879,6 +880,7 @@ sub _initialise
     my $self = shift;
     $self->{_config} = shift; # ref to %conf
     $self->{"_object_count"} = 0; # keeps count of objects
+    $self->{_nodes} = {};
     return;
   }
 
@@ -1236,7 +1238,18 @@ sub _layout_dia_new {
   foreach my $relationship (@relationships)
     { $relationship->Reposition; }
 
+  $self->{_nodes} = \%nodes;
+
   return 1;
+}
+
+sub object_from_id {
+  my ($self, $id) = @_;
+  my $object;
+  if (ref $self->{_nodes}) {
+    $object = $self->{_nodes}{$id}{entity};
+  };
+  return $object;
 }
 
 #

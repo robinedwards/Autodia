@@ -1,5 +1,11 @@
 Changes to AutoDia
 ------------------
+version 2.05 1/11/2007
+- set default output path for TT to .
+- added templates for mysql ddl and perl pod
+- added new object_from_id method to Diagram class
+- added support for simple Object::InsideOut syntax
+- fixed file naming for -F argument
 
 version 2.04 29/8/2007
 - escapes nasty badness in perl attribute names found in code

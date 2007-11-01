@@ -34,5 +34,6 @@ lib/Autodia/Handler/python.pm
 lib/Autodia/Handler/umbrello.pm
 lib/Autodia/Handler/CSharp.pm
 templates/mysql_ddl.tt
+templates/pod.tt
 examples/skiplist
 META.yml                                 Module meta-data (added by MakeMaker)

@@ -55,10 +55,16 @@ sub output
     my $self    = shift;
     my $alternative_filename = shift;
     my $Diagram = $self->{Diagram};
-
-    if (defined $alternative_filename ) { $alternative_filename =~ s|\/|--|g; }
-
     my %config = %{$self->{Config}};
+
+    if (defined $alternative_filename ) { 
+	foreach my $dir (@{$config{'directory'}}) {
+	    $alternative_filename =~ s|^$dir||g;
+	}
+	$alternative_filename =~ s|\/|-|g;
+	$alternative_filename =~ s|^-||;
+    }
+    
 
     $Diagram->remove_duplicates;
 

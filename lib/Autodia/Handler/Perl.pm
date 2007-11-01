@@ -102,6 +102,7 @@ sub _parse {
     # Class::Tangram bits
     $self->{_is_tangram_class} = {};
     $self->{_in_tangram_class} = 0;
+    $self->{_insideout_class} = 0;
     my $pat1 = '[\'\"]?\w+[\'\"]?\s*=>\s*\{.*?\}';
     my $pat2 = '[\'\"]?\w+[\'\"]?\s*=>\s*undef';
 
@@ -212,6 +213,33 @@ sub _parse {
 	    my $componentName = $2;
 	    # discard if stopword
 	    next if ($componentName =~ /^(strict|vars|exporter|autoloader|warnings.*|constant.*|data::dumper|carp.*|overload|switch|\d|lib)$/i);
+
+	    if ($componentName eq 'Object::InsideOut') {
+	      $self->{_insideout_class} = 1;
+	      if ($line =~ /^\s*use\s+.*qw\((.*)\)/) {
+		my @superclasses = split(/[\s+]/, $1);
+		foreach my $super (@superclasses) {
+		  my $Superclass = Autodia::Diagram::Superclass->new($super);
+		  # add superclass to diagram
+		  $self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
+
+		  my $exists_already = $Diagram->add_superclass($Superclass);
+		  #	  warn "already exists ? $exists_already \n";
+		  if (ref $exists_already) {
+		    $Superclass = $exists_already;
+		  }
+		  # create new inheritance
+		  my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+		  # add inheritance to superclass
+		  $Superclass->add_inheritance($Inheritance);
+		  # add inheritance to class
+		  $Class->add_inheritance($Inheritance);
+		  # add inheritance to diagram
+		  $Diagram->add_inheritance($Inheritance);
+		}
+	      }
+	      next;
+	    }
 
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
@@ -434,6 +462,27 @@ sub _parse {
 	    $Class->add_operation({ name => $col, visibility => $visibility, Id => $Diagram->_object_count() } );
 	  }
 	}
+
+
+      # if line is Object::InsideOut metadata then parse out
+      if ($self->{_insideout_class} && $line =~ /^\s*my\s+\@\w+\s+\:FIELD\s*\((.*)\)/) {
+	my $field_data = $1;
+	$field_data =~ s/['"\s]//g;
+	my %field_data = split( /\s*(?:=>|,)\s*/, $field_data);
+	(my $col = $field_data{Get} ) =~ s/get_//;
+	$Class->add_attribute({
+			       name => $col,
+			       visibility => 0,
+			       Id => $Diagram->_object_count,
+				});
+	foreach my $key ( keys %field_data ) {
+	  # add accessor/mutator
+	  if ($key =~ m/(Get|Set|Acc|Mut|Com)/) {
+	    $Class->add_operation({ name => $field_data{$key}, visibility => 0, Id => $Diagram->_object_count() } );
+	  }
+	}
+
+      }
 
 	# if line contains sub then parse for method data
 	if ($line =~ /^\s*sub\s+?(\w+)/) {
