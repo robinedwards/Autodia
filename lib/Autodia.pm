@@ -5,6 +5,10 @@ use strict;
 
 Autodia.pm - The configuration and Utility perl module for AutoDia.
 
+=head1 VERSION
+
+2.06
+
 =head1 DESCRIPTION
 
 AutoDia takes source files as input and using a handler parses them to create documentation through templates. The handlers allow AutoDia to parse any language by providing 
@@ -71,7 +75,7 @@ my %perl = (
 BEGIN {
         use Exporter ();
         use vars qw($VERSION @ISA @EXPORT);
-        $VERSION = "2.05";
+        $VERSION = "2.06";
         @ISA = qw(Exporter);
         @EXPORT = qw(
 		     &getHandlers

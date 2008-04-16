@@ -1185,7 +1185,7 @@ sub _layout_dia_new {
 		  plot_branch($self,$nodes{$child},$childpos,$side);
 		  $childpos += $child_increment;
 	      }
-	  } elsif ( scalar @{$rows[1]} && $done2ndrow == 0) {
+	  } elsif ( defined $rows[1] && scalar @{$rows[1]} && $done2ndrow == 0) {
 	      $done2ndrow = 1;
 	      foreach my $node ( @{$rows[1]} ) {
 		  #		warn "handling node in next row\n";
@@ -1371,7 +1371,7 @@ sub plot_branch {
       $self->{_dia_nodes}{$b}{weight} <=> $self->{_dia_nodes}{$a}{weight}
     } @{$node->{children}};
     unshift (@sorted_children, pop(@sorted_children));
-    my $child_increment = (ref $self->{_dia_rows}[$depth + 1]) ? $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]}): 0 ;
+    my $child_increment = (ref $self->{_dia_rows}[$depth + 1]) ? $self->{_dia_widest_row} / (scalar @{$self->{_dia_rows}[$depth + 1]} || 1) : 0 ;
     my $childpos = 0;
     if ( $side eq 'left' ) {
       $childpos = 0

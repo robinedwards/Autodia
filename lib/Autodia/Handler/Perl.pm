@@ -199,6 +199,11 @@ sub _parse {
 		    # add inheritance to diagram
 		    $Diagram->add_inheritance($Inheritance);
 		}
+
+
+	    if (grep (/DBIx::Class$/,@superclasses)) {
+	      $self->{_dbix_class} = 1;
+	    }
 	    next;
 	}
 
@@ -221,8 +226,6 @@ sub _parse {
 		foreach my $super (@superclasses) {
 		  my $Superclass = Autodia::Diagram::Superclass->new($super);
 		  # add superclass to diagram
-		  $self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
-
 		  my $exists_already = $Diagram->add_superclass($Superclass);
 		  #	  warn "already exists ? $exists_already \n";
 		  if (ref $exists_already) {
@@ -463,6 +466,43 @@ sub _parse {
 	  }
 	}
 
+
+      if ($self->{_dbix_class_columns}) {
+	my $found_end = 0;
+	$line =~ s/#.*$//;
+	if ($line =~ m|\);|) {
+	  $found_end = 1;
+	  $line =~ s/\);.*//;
+	}
+	$self->{_dbix_class_columns} .= $line;
+	if ($found_end) { 
+	  my $columns_text = $self->{_dbix_class_columns} . '}';
+#	  warn "class : , ", $Class->Name, "\n";
+#	  warn "columns text : $columns_text \n";
+	  # process with eval ala data::dumper
+	  my $columns = eval $columns_text;
+#	  warn Dumper $columns;
+	  foreach my $attr_name (keys %$columns) {
+	    $Class->add_attribute({
+				   name => $attr_name,
+				   visibility => 0,
+				   Id => $Diagram->_object_count,
+				   type => $columns->{$attr_name}{data_type},
+				  });
+	  }
+
+	  delete $self->{_dbix_class_columns};
+	  $self->{_dbix_class} = 0;
+	}
+
+      }
+
+      # if line is DBIx::Class metadata then parse out
+      if ($self->{_dbix_class} && $line =~ /add_columns\s*\((.*)/) {
+	my $field_data = $1;
+	$field_data =~ s/#.*$//;
+	$self->{_dbix_class_columns} = "{ $field_data ";
+      }
 
       # if line is Object::InsideOut metadata then parse out
       if ($self->{_insideout_class} && $line =~ /^\s*my\s+\@\w+\s+\:FIELD\s*\((.*)\)/) {
