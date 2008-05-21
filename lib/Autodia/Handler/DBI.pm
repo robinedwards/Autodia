@@ -44,6 +44,7 @@ sub _parse_file { # parses dbi-connection string
   my $self     = shift();
   my $filename = shift();
   my %config   = %{$self->{Config}};
+  $self->{Diagram}->directed(0);
 
   # new dbi connection
   my $dbh = DBI->connect("DBI:$filename", $config{username}, $config{password});
@@ -51,30 +52,33 @@ sub _parse_file { # parses dbi-connection string
   my $escape_tablenames = 0;
   my $unescape_tablenames=0;
   my $database_type =  $dbh->get_info( 17 );
-  warn "DBI - processing database type : $database_type\n";
+  my ($scheme, $driver, $attr_string, $attr_hash, $driver_dsn) = DBI->parse_dsn("DBI:$filename") or die "Can't parse DBI DSN '$filename'";
+  my $dbname;
+  if ($driver_dsn =~ m/db=([^\:]+)/) {
+    $dbname = $1;
+  } else {
+    ( $dbname = $driver_dsn) =~ s/([^\:]+)/$1/;
+  }
 
   my $schema = '' ;
   # only keep tables in schema public for PostgreSQL
   # could be given as a parameter... (+ a list of tables...)
   $schema = 'public' if (lc($database_type) =~ m/(oracle|postgres)/);
 
-  print "database type : $database_type $schema\n";
-
   # Manage database tablenames that need to be escaped before calling DBI
   # and those that need to be unescaped before calling DBI 
   $escape_tablenames = 1 if (lc($database_type) =~ m/(oracle|postgres)/);
   $unescape_tablenames = 1 if (lc($database_type) =~ m/(mysql)/);
-  print "esc : $escape_tablenames unescape $unescape_tablenames\n";
 
   # pre-process tables
   foreach my $table ($dbh->tables(undef, $schema, '%', '')) {
       $table =~ s/['`"]//g;
+      $table =~ s/.*\.(.*)$/$1/;
       my $esc_table = $table;
       $esc_table = qq{"$esc_table"} if ($escape_tablenames);
       my $sth = $dbh->prepare("select * from $esc_table where 1 = 0");
       $sth->execute;
       $self->{tables}{$table}{fields} = $sth->{NAME};
-#      $self->{tables}{$table}{fields_hash} = map { $_ => 1 } $sth->{NAME};
       $sth->finish;
   }
 
@@ -90,26 +94,39 @@ sub _parse_file { # parses dbi-connection string
     my $esc_table = $table;
     $esc_table = qq{"$esc_table"} if ($escape_tablenames);
 
-#    warn "table : $esc_table\n";
-
+    my $primary_key = { name=>'Key', type=>'Primary', Param=>[], visibility=>0, };
+    my $sth = $dbh->primary_key_info( $schema || undef, $dbname,  $table ) or die $dbh->errstr;
+    my @key_columns = keys %{$sth->fetchall_hashref('COLUMN_NAME')};
+    if (@key_columns) {
+      push (@{$primary_key->{Param}}, map ({ Name=>$_, Type=>''}, @key_columns));
+      $Class->add_operation($primary_key);
+    }
     for my $field (@{$self->{tables}{$table}{fields}}) {
+      my $sth = $dbh->column_info( $schema || undef, $dbname,  $table, $field );
+      my $field_info = $sth->fetchrow_hashref;
+#      warn Dumper(type => $field_info);
       $Class->add_attribute({
 			     name => $field,
 			     visibility => 0,
-			     type => '',
+			     type => $field_info->{TYPE_NAME},
 			    });
 
       if (my $dep = $self->_is_foreign_key($table, $field)) {
-	$self->{foreign_tables}{$dep} = {field => $field, table => $table, class => $Class }
+	# fix - need to handle multiple relations per table
+	push(@{$self->{foreign_tables}{$dep}}, {field => $field, table => $table, class => $Class });
+	$Class->add_operation( { name=>'Key', type=>'Foreign', Param=>[ { Name => $field, Type => $field_info->{TYPE_NAME}, }], visibility=>0, } );
       }
     }
   }
 
+  # fix - need to handle multiple relations per table
   foreach my $fk_table (keys %{$self->{foreign_tables}} ) {
-    $self->_add_foreign_keytable($self->{foreign_tables}{$fk_table}{table},
-				 $self->{foreign_tables}{$fk_table}{field},
-				 $self->{foreign_tables}{$fk_table}{class},
+      foreach my $relation ( @{$self->{foreign_tables}{$fk_table}}) {
+	  $self->_add_foreign_keytable($relation->{table},
+				 $relation->{field},
+				 $relation->{class},
 				 $fk_table);
+      }
   }
 
   $dbh->disconnect;
@@ -121,19 +138,17 @@ sub _add_foreign_keytable {
 
   my $Superclass = Autodia::Diagram::Superclass->new($dep);
   my $exists_already = $self->{Diagram}->add_superclass($Superclass);
-  if (ref $exists_already) {
-    $Superclass = $exists_already;
-    # create new relationship
-    my $Relationship = Autodia::Diagram::Inheritance->new($Class, $Superclass);
-    # add Relationship to superclass
-    $Superclass->add_inheritance($Relationship);
-    # add Relationship to class
-    $Class->add_inheritance($Relationship);
-    # add Relationship to diagram
-    $self->{Diagram}->add_inheritance($Relationship);
-  } else {
-    warn "misguessed foreign key : $field\n";
-  }
+  $Superclass = $exists_already if (ref $exists_already);
+
+  # create new relationship
+  my $Relationship = Autodia::Diagram::Relation->new($Class, $Superclass);
+  # add Relationship to superclass
+  $Superclass->add_relation($Relationship);
+  # add Relationship to class
+  $Class->add_relation($Relationship);
+  # add Relationship to diagram
+  $self->{Diagram}->add_relation($Relationship);
+
   return;
 }
 
@@ -141,8 +156,12 @@ sub _is_foreign_key {
   my ($self, $table, $field) = @_;
   my $is_fk = undef;
   $field =~ s/'"`//g;
-  if (($field !~ m/$table.u?id/i) && ($field =~ m/^(.*)_u?id$/i)) {
-      $is_fk = ($self->{tables}{$1}) ? $1 : undef;
+
+  if ($field =~ m/^(.*)_u?id$/i) {
+      my $foreign_table = $1;
+      unless ($foreign_table eq $table) {
+	  $is_fk = $foreign_table if ($self->{tables}{$foreign_table});
+      }
   } elsif (($field ne $table ) && ($self->{tables}{$field})) {
       $is_fk = $field;
   }
