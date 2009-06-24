@@ -100,6 +100,8 @@ sub _parse {
     my $Class;
 
     # Class::Tangram bits
+    $self->{_superclasses} = {};
+    $self->{_modules} = {};
     $self->{_is_tangram_class} = {};
     $self->{_in_tangram_class} = 0;
     $self->{_insideout_class} = 0;
@@ -110,10 +112,8 @@ sub _parse {
     $self->{pod} = 0;
 
     # parse through file looking for stuff
-    my $continue_base = 0;
-    my $continue_fields = 0;
-    my $continue_package = 0;
-    my $continue_cdbi_cols = 0;
+    my $continue = {};
+    my $last_sub;
 
     my $line_no = 0;
     foreach my $line (<$fh>) {
@@ -125,15 +125,15 @@ sub _parse {
 
 
 	# if line contains package name then parse for class name
-	if ($line =~ /^\s*package\s+($pkg_regexp)?;?/ || $continue_package) {
-	  $line =~ /^\s*($pkg_regexp);/ if($continue_package);
+	if ($line =~ /^\s*package\s+($pkg_regexp)?;?/ || $continue->{package}) {
+	  $line =~ /^\s*($pkg_regexp);/ if($continue->{package});
 	  if(!$1) {
 	    warn "No package name! line $line_no : $line\n";
-            $continue_package = 1;
+            $continue->{package} = 1;
             next;
 	  }
 
-	  $continue_package = 0;
+	  $continue->{package} = 0;
 	  my $className = $1;
 	  last if ($self->skip($className));
 	  # create new class with name
@@ -142,7 +142,8 @@ sub _parse {
 	  $Class = $Diagram->add_class($Class);
 	}
 
-	if ($line =~ /^\s*use\s+base\s+(?:q|qw|qq)?\s*([\'\"\(\{\/\#])\s*([^\'\"\)\}\/\#]*)\s*(\1|[\)\}])?/ or ($continue_base && $line =~ /$continue_base/)) {
+        my $continue_base = $continue->{base};
+	if ($line =~ /^\s*use\s+(?:base|parent)\s+(?:q|qw|qq)?\s*([\'\"\(\{\/\#])\s*([^\'\"\)\}\/\#]*)\s*(\1|[\)\}])?/ or ($continue_base && $line =~ /$continue_base/)) {
 
 	    my $superclass = $2;
 	    my $end = $3 || '';
@@ -169,7 +170,7 @@ sub _parse {
 #		warn "continue base : $continue_base\n";
 	    }
 #	    warn "superclass : $superclass\n";
-
+	    $continue->{base} = $continue_base;
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
 
@@ -182,7 +183,10 @@ sub _parse {
 		    # create superclass
 		    my $Superclass = Autodia::Diagram::Superclass->new($super);
 		    # add superclass to diagram
-
+		    $self->{_superclasses}{$Class->Name}{$super} = 1;
+		    if ($super =~ m/Class..Accessor\:\:/) {
+			$self->{_superclasses}{$Class->Name}{'Class::Accessor'} = 1;
+		    }
 
 		    $self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
 
@@ -210,6 +214,7 @@ sub _parse {
 
 	# if line contains dependancy name then parse for module name
 	if ($line =~ /^\s*(use|require)\s+($pkg_regexp)/) {
+#	    warn "found a module being used/requireed : $2\n";
 	    unless (ref $Class) {
 		# create new class with name
 		$Class = Autodia::Diagram::Class->new($filename);
@@ -245,10 +250,12 @@ sub _parse {
 	      next;
 	    }
 
+	    $self->{_modules}{$componentName} = 1;
+
 	    # check package exists before doing stuff
 	    $self->_is_package(\$Class, $filename);
 
-
+	    my $continue_fields = $continue->{fields};
 	    if ($line =~ /\s*use\s+(fields|private|public)\s+(?:q|qw|qq){0,1}\s*([\'\"\(\{\/\#])\s*(.*)\s*([\)\}\1]?)/ or $continue_fields) {
 		my ($pragma,$fields) = ($1,$3);
 #		warn "pragma : $pragma .. fields : $fields\n";
@@ -302,6 +309,7 @@ sub _parse {
 		$Component->add_dependancy($Dependancy);
 		next;
 	    }
+	    $continue->{fields} = $continue_fields;
 	}
 
 	# if ISA in line then extract templates/superclasses
@@ -329,6 +337,7 @@ sub _parse {
 			if (ref $exists_already) {
 			    $Superclass = $exists_already;
 			}
+			$self->{_superclasses}{$Class->Name}{$super} = 1;
 			$self->{_is_tangram_class}{$Class->Name} = {state=>0} if ($super eq 'Class::Tangram');
 			# create new inheritance
 			#	      warn "creating inheritance from superclass : $super\n";
@@ -344,6 +353,31 @@ sub _parse {
 		warn "ignoring empty \@ISA line $line_no \n";
 	    }
 	}
+
+      if ($self->{_modules}{Moose} && $line =~ m/extends (?:q|qw|qq)?\s*([\'\"\(\{\/\#])\s*([^\'\"\)\}\/\#]*)\s*(\1|[\)\}])?/ ) {
+	  my $superclass = $2;
+	  my @superclasses = split(/[\s*,]/, $superclass);
+
+	  foreach my $super (@superclasses) # WHILE_SUPERCLASSES
+	    {
+		my $Superclass = Autodia::Diagram::Superclass->new($super);
+		# add superclass to diagram
+		$self->{_superclasses}{$Class->Name}{$super} = 1;
+		my $exists_already = $Diagram->add_superclass($Superclass);
+		#	  warn "already exists ? $exists_already \n";
+		if (ref $exists_already) {
+		    $Superclass = $exists_already;
+		}
+		# create new inheritance
+		my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+		# add inheritance to superclass
+		$Superclass->add_inheritance($Inheritance);
+		# add inheritance to class
+		$Class->add_inheritance($Inheritance);
+		# add inheritance to diagram
+		$Diagram->add_inheritance($Inheritance);
+	    }
+      }
 
 	# Handle Class::Tangram classes
 	if (ref $self) {
@@ -415,7 +449,7 @@ sub _parse {
 
 	}
 
-	# handle Class::DBI/Ima::DBI/Class::Accessor
+	# handle Class::DBI/Ima::DBI
 	if ($line =~ /->columns\(\s*All\s*=>\s*(.*)$/) {
 	  my $columns = $1;
 	  my @cols;
@@ -441,33 +475,135 @@ sub _parse {
 	    $Class->add_operation({ name => $col, visibility => $visibility, Id => $Diagram->_object_count() } );
 	  }
 
-	  $continue_cdbi_cols = 1 unless $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
+	  $continue->{cdbi_cols} = 1 unless $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
 	  next;
 	}
 
-	if ($continue_cdbi_cols) {
-	  my @cols;
-	  $continue_cdbi_cols = 0 if $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
-	  if ($line =~ /'.+'/) {
-	    $line =~ s/\s*[\)\]\}\/\#\|]\s*$//;
-	    @cols =  map( /'(.*)'/ ,split(/\s*,\s*/,$line));
-	  } else {
-	    @cols = split(/\s+/,$line);
+      # handle Class::Data::Inheritable
+      #	  Stuff->mk_classdata(
+      if ( $Class && $self->{_superclasses}{$Class->Name}{'Class::Data::Inheritable'} ) {
+	  if ($line =~ /->mk_classdata\((\w+)/) {
+	      my $attribute = $1;
+	      my $visibility = ( $attribute =~ m/^\_/ ) ? 1 : 0;
+	      $Class->add_attribute({
+				     name => $attribute,
+				     visibility => $visibility,
+				     Id => $Diagram->_object_count,
+				    });
+	      # add accessor
+	      $Class->add_operation({ name => $attribute, visibility => $visibility, Id => $Diagram->_object_count() } );
 	  }
-	  foreach my $col ( @cols ) {
+      }
+
+      if ( $Class && $self->{_superclasses}{$Class->Name}{'Class::Accessor'} ) {
+	# handle Class::Accessor
+	if ($line =~ /->mk_accessors\s*\(\s*(.*)$/) {
+	  my $attributes = $1;
+	  my @attributes;
+	  if ($attributes =~ s/^qw(.)//) {
+	    $attributes =~ s/\s*[\)\]\}\/\#\|]\s*\)\s*;\s*(#.*)?$//;
+	    @attributes = split(/\s+/,$attributes);
+	  } elsif ($attributes =~ /'.+'/) {
+	    @attributes =  map( /'(.*)'/ ,split(/\s*,\s*/,$attributes));
+	  } else {
+	    warn "can't parse CDBI style attributes line $line_no\n";
+	    next;
+	  }
+
+	  foreach my $attribute ( @attributes ) {
 	    # add attribute
-	    my $visibility = ( $col =~ m/^\_/ ) ? 1 : 0;
+	      next unless ($attribute =~ m/\w+/);
+	    my $visibility = ( $attribute =~ m/^\_/ ) ? 1 : 0;
 	    $Class->add_attribute({
-				   name => $col,
+				   name => $attribute,
 				   visibility => $visibility,
 				   Id => $Diagram->_object_count,
 				  });
-	    # add accessor
-	    $Class->add_operation({ name => $col, visibility => $visibility, Id => $Diagram->_object_count() } );
+	      # add accessor if not already present
+	      unless ($Class->get_operation($attribute)) {
+		  $Class->add_operation({ name => $attribute, visibility => $visibility, Id => $Diagram->_object_count() } );
+	      }
 	  }
+
+	  $continue->{class_accessor_attributes} = 1 unless $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
+	  next;
 	}
+    }
 
 
+      if ($continue->{class_accessor_attributes}) {
+	  my @attributes;
+	  $continue->{class_accessor_attributes} = 0 if $line =~ s/(.*)\)\s*;(#.*)?\s*$/$1/;
+	  if ($line =~ /'.+'/) {
+	      $line =~ s/\s*[\)\]\}\/\#\|]\s*$//;
+	      @attributes =  map( /'(.*)'/ ,split(/\s*,\s*/,$line));
+	  } else {
+	      @attributes = split(/\s+/,$line);
+	  }
+	  foreach my $attribute ( @attributes ) {
+	      next unless ($attribute =~ m/\w+/);
+	      # add attribute
+	      my $visibility = ( $attribute =~ m/^\_/ ) ? 1 : 0;
+	      $Class->add_attribute({
+				     name => $attribute,
+				     visibility => $visibility,
+				     Id => $Diagram->_object_count,
+				    });
+
+	      # add accessor if not already present
+	      unless ($Class->get_operation($attribute)) {
+		  $Class->add_operation({ name => $attribute, visibility => $visibility, Id => $Diagram->_object_count() } );
+	      }
+	  }
+      }
+
+
+      # handle Params::Validate
+      if ($last_sub && $self->{_modules}{'Params::Validate'} && ( $line =~ m/validate(_pos)?\s*\(/ or $self->{_in_params_validate_arguments} )) {
+	  my $found_end = 0;
+#	  warn "found params::validate for sub $last_sub \n line : $line\n";
+	  $self->{_in_params_validate_arguments} = 1;
+	  $self->{_in_params_validate_positional_arguments} = 1 if $line =~ m/validate_pos/ ;
+	  if ($line =~ m|\)\s*;|) {
+	      $found_end = 1;
+	      $line =~ s/\)\s*;.*//;
+#	      warn "found end \n";
+	  } 
+	  $self->{_params_validate_arguments} .= $line;
+
+	  if ($found_end) { 
+	      my $validate_text = $self->{_params_validate_arguments};
+#	      warn "found params::validate text : $validate_text\n";
+
+	      # process with eval ala data::dumper
+	      $validate_text =~ s/.*validate\w*\s*\(\s*\@_\s*,//;
+#	      warn "evaluating params::validate text : $validate_text\n";
+	      my $params = eval $validate_text;
+#	      warn Dumper $params;
+	      my $parameters = [];
+	      push (@$parameters, { Name => "(HASHREF)" }) unless ( $self->{_in_params_validate_positional_arguments} );
+	      foreach my $param_name (keys %$params) {
+		  my $parameter = { Name => $param_name };
+		  if (ref $params->{$param_name} && ( $params->{type} || $params->{isa} ) ) {
+		      $parameter->{Type} = $params->{type} || $params->{isa};
+		  }
+		  push (@$parameters, $parameter);
+	      }
+	      if (scalar @$parameters) {
+		  my $operation = $Class->get_operation($last_sub);
+		  $operation->{Params} ||= [];
+		  push (@{$operation->{Params}}, @$parameters);
+		  $Class->update_operation($operation);
+	      }
+	      
+	      delete $self->{_params_validate_arguments};
+	      $self->{_in_params_validate_arguments} = 0;
+	      $self->{_in_params_validate_positional_arguments} = 0;
+	  }
+      }
+
+      
+      # handle DBIx::Class
       if ($self->{_dbix_class_columns}) {
 	my $found_end = 0;
 	$line =~ s/#.*$//;
@@ -505,8 +641,19 @@ sub _parse {
 	$self->{_dbix_class_columns} = "{ $field_data ";
       }
 
+
+      # add Moose attributes
+      if ($self->{_modules}{Moose} && $line =~ /^\s*has\s+'?(\w+)'?/) {
+	  my $attr_name = $1;
+	  $Class->add_attribute({
+				 name => $attr_name,
+				 visibility => 0,
+				 Id => $Diagram->_object_count,
+				});
+      }
+
       # if line is DBIx::Class relationship then parse out
-      if ($line =~ /\-\>has_(many|one|)\s*\((.*)/ or $line =~ /\-\>(belongs_to|)\s*\((.*)/) {
+      if ($line =~ /\-\>has_(many|one)\s*\((.*)/ or $line =~ /\-\>(belongs_to)\s*\((.*)/) {
 	my ($rel_type, $rel_data) = ($1,$2);
 	$rel_data =~ s/#.*$//;
 	my ($rel_name,$related_classname) = split(/\s*(?:\=\>|,)\s*/,$rel_data);
@@ -574,6 +721,8 @@ sub _parse {
 
 	    $subname =~ s/^(.*?)['"]\..*$/${1}_xxxx/;
 
+	    $last_sub = $subname;
+
 	    my %subroutine = ( "name" => $subname, );
 	    $subroutine{"visibility"} = ($subroutine{"name"} =~ m/^\_/) ? 1 : 0;
 	    $subroutine{"Id"} = $Diagram->_object_count();
@@ -581,7 +730,10 @@ sub _parse {
 	    # if we wanted to be clever we could count the parameters
 	    # see Autodia::Handler::PHP for an example of parameter handling
 
-	    $Class->add_operation(\%subroutine);
+	    unless ($Class->get_operation($subname)) {
+		$Class->add_operation(\%subroutine);
+	    }
+
 	}
 
 	# if line contains object attributes parse add to class

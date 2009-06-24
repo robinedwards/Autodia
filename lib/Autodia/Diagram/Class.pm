@@ -3,67 +3,62 @@ use strict;
 
 =head1 NAME
 
-DiagramClass - Class that holds, updates and outputs the values of a diagram element of type class.
+Autodia::Diagram::Class - Class that holds, updates and outputs the values of a diagram element of type class.
 
 =head1 SYNOPSIS
 
-use DiagramClass;
+use Autodia::Diagram::Class;
 
-my $Class = DiagramClass->new;
+my $Class = Autodia::Diagram::Class->new;
 
 =head2 Description
 
-DiagramClass is an object that represents the Dia UML Class element within a Dia diagram. It holds, outputs and allows the addition of attributes, relationships and methods.
+Autodia::Diagram::Class is an object that represents the Dia UML Class element within a Dia diagram. It holds, outputs and allows the addition of attributes, relationships and methods.
 
 =cut
 
-use vars qw($VERSION @ISA @EXPORT);
-require Exporter;
-
-use Autodia::Diagram::Object;
 use Data::Dumper;
 
-@ISA = qw(Autodia::Diagram::Object Exporter);
+use base qw(Autodia::Diagram::Object);
 
 =head1 METHODS
 
 =head2 Constructor
 
-my $Class = DiagramClass->new($name);
+my $Class = Autodia::Diagram::Class->new($name);
 
-creates and returns a simple DiagramClass object, containing its name and its original position (default 0,0).
+creates and returns a simple Autodia::Diagram::Class object, containing its name and its original position (default 0,0).
 
 =head2 Accessors
 
-DiagramClass attributes are accessed through methods, rather than directly. Each attribute is available through calling the method of its name, ie Inheritances(). The methods available are : 
+Autodia::Diagram::Class attributes are accessed through methods, rather than directly. Each attribute is available through calling the method of its name, ie Inheritances(). The methods available are : 
 
 Operations, Attributes, Inheritances, Dependancies, Parent, and has_child. The first 4 return a list, the later return a string.
 
-Adding elements to the DiagramClass is acheived through the add_<attribute> methods, ie add_inheritance().
+Adding elements to the Autodia::Diagram::Class is acheived through the add_<attribute> methods, ie add_inheritance().
 
-Rather than remove an element from the diagram it is marked as redundant and replaced with a superceding element, as DiagramClass has highest precedence it won't be superceded and so doesn't have a redundant() method. Superclass and Component do.
+Rather than remove an element from the diagram it is marked as redundant and replaced with a superceding element, as Autodia::Diagram::Class has highest precedence it won't be superceded and so doesn't have a redundant() method. Superclass and Component do.
 
-=head2 Accessing and manipulating the DiagramClass
+=head2 Accessing and manipulating the Autodia::Diagram::Class
 
-$DiagramClass->Attributes(), Inheritances(), Operations(), and Dependancies() all return a list of their respective elements.
+$Class->Attributes(), Inheritances(), Operations(), and Dependancies() all return a list of their respective elements.
 
-$DiagramClass->Parent(), and has_child() return the value of the parent or child respectively if present otherwise a false.
+$Class->Parent(), and has_child() return the value of the parent or child respectively if present otherwise a false.
 
-$Diagram->add_attribute(), add_inheritance(), add_operation(), and add_dependancy() all add a new element of their respective types.
+$Class->add_attribute(), add_inheritance(), add_operation(), and add_dependancy() all add a new element of their respective types.
 
 =cut
 
 #####################
 # Constructor Methods
 
-sub new
-{
+sub new {
   my $class = shift;
   my $name = shift;
-  my $DiagramClass = {};
-  bless ($DiagramClass, ref($class) || $class);
-  $DiagramClass->_initialise($name);
-  return $DiagramClass;
+  my $self = {};
+  bless ($self, ref($class) || $class);
+  $self->_initialise($name);
+  return $self;
 }
 
 #-------------------------------------------------------------------------
@@ -242,14 +237,61 @@ sub Operations {
 
 sub add_operation {
   my $self = shift;
-  my %operation = %{shift()};
-  push (@{$self->{"operations"}},\%operation);
+  my $operation = shift();
+  $operation->{_id} = ( ref $self->{"operations"} ) ? scalar @{$self->{"operations"}} : 0 ;
+  push (@{$self->{"operations"}},$operation);
+  $self->{operation_index}{$operation->{name}} = $operation;
 
   $self->_set_updated("operations");
   $self->_update;
 
   return scalar(@{$self->{"operations"}});
 }
+
+sub get_operation {
+    my ($self, $name) = @_;
+    return $self->{operation_index}{$name};
+}
+
+sub update_operation {
+    my $self = shift;
+    my $operation = shift;
+    
+    $self->{"operations"}[$operation->{_id}] = $operation;
+    $self->{operation_index}{$operation->{name}} = $operation;
+
+    $self->_set_updated("operations");
+    $self->_update;
+
+    return;
+}
+
+sub Realizations {
+  my $self = shift;
+  if( defined $self->{"realizations"} ) {
+    my @realizations = @{ $self->{"realizations"} };
+    return @realizations;
+  }
+  else {
+    return;
+  }
+}
+ 
+sub add_realization {
+  my $self            = shift;
+  my $new_realization = shift;
+  my @realizations;
+ 
+  if( defined $self->{"realizations"} ) {
+    @realizations = @{ $self->{"realizations"} };
+  }
+ 
+  push( @realizations, $new_realization );
+  $self->{"realizations"} = \@realizations;
+ 
+  return scalar(@realizations);
+}
+
 
 #-----------------------------------------------------------------------
 
@@ -267,6 +309,7 @@ sub _initialise {
   $self->{"height"} = 2; # arbitary
   #$self->{"operations"} = [];
   #$self->{"attributes"} = [];
+  $self->{operation_index} = {};
 
   return 1;
 }
