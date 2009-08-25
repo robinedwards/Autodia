@@ -120,9 +120,9 @@ sub _parse {
       $line_no++;
 	chomp $line;
 	if ($self->_discard_line($line)) {
+#	    warn "discarded line : $line\n";
 	    next;
 	}
-
 
 	# if line contains package name then parse for class name
 	if ($line =~ /^\s*package\s+($pkg_regexp)?;?/ || $continue->{package}) {
@@ -634,11 +634,79 @@ sub _parse {
 
       }
 
+      # if line is DBIx::Class relationship then parse out
+      if ($self->{_dbix_class_relation} or $line =~ /\-\>has_(many|one)\s*\((.*)/ or $line =~ /\-\>(belongs_to)\s*\((.*)/) {
+	  my $found_end = 0;
+	  $line =~ s/#.*$//;
+	  if ($line =~ m|\);|) {
+	      $found_end = 1;
+	      $line =~ s/\);.*//;
+	  }
+
+	  if ($line =~ /\-\>has_(many|one)\s*\((.*)/ or $line =~ /\-\>(belongs_to)\s*\((.*)/) {
+	      my ($rel_type, $rel_data) = ($1,$2);
+	      $rel_data =~ s/#.*$//;
+	      $self->{_dbix_class_relation}{rel_data} = "{ $rel_data ";
+	      $self->{_dbix_class_relation}{rel_type} = $rel_type;
+	  } else {
+	      $self->{_dbix_class_relation}{rel_data} .= $line;
+	  }
+
+	  if ($found_end) {
+	      my $reldata = $self->{_dbix_class_relation}{rel_data} . '}';
+	      my ($rel_name,$related_classname) = split(/\s*(?:\=\>|,)\s*/,$reldata);
+	      $related_classname =~ s/['"]//g;
+	      $rel_name =~ s/^\W+//;
+	      $rel_name =~ s/['"]//g;
+
+	      unless ($related_classname) {
+		  warn "no related class in relation data : $reldata\n";
+		  next;
+	      }
+
+#	      warn "creating relation : $rel_name to $related_classname\n";
+
+	      my $Superclass = Autodia::Diagram::Superclass->new($related_classname);
+	      my $exists_already = $self->{Diagram}->add_superclass($Superclass);
+	      $Superclass = $exists_already if (ref $exists_already);
+
+	      # create new relationship
+	      my $Relationship = Autodia::Diagram::Relation->new($Class, $Superclass);
+	      # add Relationship to superclass
+	      $Superclass->add_relation($Relationship);
+	      # add Relationship to class
+	      $Class->add_relation($Relationship);
+	      # add Relationship to diagram
+	      $self->{Diagram}->add_relation($Relationship);
+	      $Class->add_operation({ name => $rel_name, visibility => 0, Id => $Diagram->_object_count() } );
+
+	  }
+	  delete $self->{_dbix_class_relation};
+      }
+
       # if line is DBIx::Class column metadata then parse out
-      if ($self->{_dbix_class} && $line =~ /add_columns\s*\((.*)/) {
+      if ($self->{_dbix_class} && $line =~ m/add_columns\s*\((.*)/) {
 	my $field_data = $1;
 	$field_data =~ s/#.*$//;
 	$self->{_dbix_class_columns} = "{ $field_data ";
+      }
+
+      # if line is DBIx::Class component, then treat as superclass
+      if ($line =~ m/->load_components\s*\(\s*(?:q|qw|qq)?\s*([\'\"\(\{\/\#])\s*([^\'\"\)\}\/\#]*)\s*(\1|[\)\}])?/ ) {
+	my $component_string = $2;
+	foreach my $component_name (grep (/^\+/ , split(/[\s,]+/, $component_string ))) {
+	    $component_name =~ s/['"+]//g;
+	    my $Superclass = Autodia::Diagram::Superclass->new($component_name);
+	    my $exists_already = $self->{Diagram}->add_superclass($Superclass);
+	    $Superclass = $exists_already if (ref $exists_already);
+	    # create new inheritance
+	    my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
+	    $Superclass->add_inheritance($Inheritance);
+	    # add inheritance to class
+	    $Class->add_inheritance($Inheritance);
+	    # add inheritance to diagram
+	    $self->{Diagram}->add_inheritance($Inheritance);
+	}
       }
 
 
@@ -652,45 +720,6 @@ sub _parse {
 				});
       }
 
-      # if line is DBIx::Class relationship then parse out
-      if ($line =~ /\-\>has_(many|one)\s*\((.*)/ or $line =~ /\-\>(belongs_to)\s*\((.*)/) {
-	my ($rel_type, $rel_data) = ($1,$2);
-	$rel_data =~ s/#.*$//;
-	my ($rel_name,$related_classname) = split(/\s*(?:\=\>|,)\s*/,$rel_data);
-	$related_classname =~ s/['"]//g;
-	my $Superclass = Autodia::Diagram::Superclass->new($related_classname);
-	my $exists_already = $self->{Diagram}->add_superclass($Superclass);
-	$Superclass = $exists_already if (ref $exists_already);
-
-	# create new relationship
-	my $Relationship = Autodia::Diagram::Relation->new($Class, $Superclass);
-	# add Relationship to superclass
-	$Superclass->add_relation($Relationship);
-	# add Relationship to class
-	$Class->add_relation($Relationship);
-	# add Relationship to diagram
-	$self->{Diagram}->add_relation($Relationship);
-      }
-
-#      __PACKAGE__->load_components(qw/ PK::Auto Core +Slando::Data/);
-      # if line is DBIx::Class component, then treat as superclass
-      if ($self->{_dbix_class} && $line =~ /\-\>load_components\s*\((.*)\)/) {
-	my $component_string = $1;
-	foreach my $component_name (grep (/^\+/ , ( eval $component_string ) )) {	    
-	    $component_name =~ s/['"]//g;
-	    my $Superclass = Autodia::Diagram::Superclass->new($component_name);
-	    my $exists_already = $self->{Diagram}->add_superclass($Superclass);
-	    $Superclass = $exists_already if (ref $exists_already);
-	    # create new inheritance
-	    my $Inheritance = Autodia::Diagram::Inheritance->new($Class, $Superclass);
-	    $Superclass->add_inheritance($Inheritance);
-	    # add inheritance to class
-	    $Class->add_inheritance($Inheritance);
-	    # add inheritance to diagram
-	    $self->{Diagram}->add_inheritance($Inheritance);
-	    
-	}
-      }
 
       # if line is Object::InsideOut metadata then parse out
       if ($self->{_insideout_class} && $line =~ /^\s*my\s+\@\w+\s+\:FIELD\s*\((.*)\)/) {
