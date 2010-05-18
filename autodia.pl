@@ -22,7 +22,7 @@ my %language_handlers = %$language_handlers;
 
 # get configuration from command line
 my %args=();
-getopts("KkFCs:SDOmMaArhHi:o:p:d:t:l:zZvVU:P:",\%args);
+getopts("KkFCs:SDOmMaArhHi:o:p:d:t:l:zZvVU:P:e:",\%args);
 my %config = %{get_config(\@ARGV,\%args)};
 
 print "\n\nAutoDia - version ".$Autodia::VERSION."(c) Copyright 2003 A Trevena\n\n" unless ( $config{silent} );
@@ -117,6 +117,16 @@ sub get_config {
       $config{skip_patterns} = [ map (eval { s/[\s\n]+//g; $_ }, <SKIPFILE>) ];
       close SKIPFILE;
       warn Dumper $config{skip_patterns};
+    }
+
+    if ($args{'e'}) {
+      $config{excludefile} = $args{'e'};
+      warn "using excludefile : $config{excludefile}\n";
+      unless (-f $config{excludefile}) { die "couldn't use $config{excludefile} : $!\n"; }
+      open(EXCLUDEFILE, "<$config{excludefile}") or die "couldn't use $config{excludefile} : $!\n";
+      $config{exclude_patterns} = [ map (eval { s/[\s\n]+//g; $_ }, <EXCLUDEFILE>) ];
+      close EXCLUDEFILE;
+      warn Dumper $config{exclude_patterns};
     }
 
     my $inputpath = "";
@@ -252,7 +262,8 @@ autodia.pl -D                     : ignore dependancies (ie do not process or di
 autodia.pl -K                     : process dependance but do not display in output
 autodia.pl -k                     : process inheritance but do not display in output
 autodia.pl -S                     : silent mode, no output to stdout except with -O
-autodia.pl -s skipfile            : exclude files or packagenames matching those listed in file
+autodia.pl -s skipfile            : exclude files or packagenames matching those listed in file from the analysis
+autodia.pl -e excludefile         : exclude files or packagenames matching those listed in file from the diagram
 autodia.pl -H                     : show only public/visible methods and attributes
 autodia.pl -m                     : show only Class methods
 autodia.pl -M                     : do not show Class Methods

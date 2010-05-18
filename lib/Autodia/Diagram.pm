@@ -104,6 +104,7 @@ The diagram is laid out and output to a file using the export_xml() method.
 sub directed {
     my $self = shift;
     my $value = shift;
+
     $self->{directed} = $value if (defined $value);
     $self->{directed} ||= 0;
     return $self->{directed};
@@ -128,6 +129,12 @@ sub add_dependancy
     my $self = shift;
     my $dependancy = shift;
 
+    my %config = %{$self->{_config}};
+
+    foreach my $exclude_pattern ( @{$config{exclude_patterns}} ) {
+            return if $dependancy->{_parent}->{name} =~ m/$exclude_pattern/ || $dependancy->{_child}->{name} =~ m/$exclude_pattern/;
+    }
+
     $self->_package_add($dependancy);
     $dependancy->Set_Id($self->_object_count);
 
@@ -147,6 +154,12 @@ sub add_realization {
 sub add_inheritance {
     my $self = shift;
     my $inheritance = shift;
+
+    my %config = %{$self->{_config}};
+
+    foreach my $exclude_pattern ( @{$config{exclude_patterns}} ) {
+            return if $inheritance->{_parent}->{name} =~ m/$exclude_pattern/;
+    }
 
     $self->_package_add($inheritance);
     $inheritance->Set_Id($self->_object_count);
@@ -169,6 +182,12 @@ sub add_component
     my $self = shift;
     my $component = shift;
     my $return = 0;
+
+    my %config = %{$self->{_config}};
+
+    foreach my $exclude_pattern ( @{$config{exclude_patterns}} ) {
+            return if $component->{name} =~ m/$exclude_pattern/;
+    }
 
     # check to see if package of this name already exists
     my $exists = $self->_package_exists($component);
@@ -198,6 +217,12 @@ sub add_superclass
   my $superclass = shift;
   my $return = 0;
 
+  my %config = %{$self->{_config}};
+
+  foreach my $exclude_pattern ( @{$config{exclude_patterns}} ) {
+          return if $superclass->{name} =~ m/$exclude_pattern/;
+  }
+
   # check to see if package of this name already exists
   my $exists = $self->_package_exists($superclass);
 
@@ -219,6 +244,12 @@ sub add_class
 {
     my $self = shift;
     my $class = shift;
+
+    my %config = %{$self->{_config}};
+
+    foreach my $exclude_pattern ( @{$config{exclude_patterns}} ) {
+            return if $class->{name} =~ m/$exclude_pattern/;
+    }
 
     # some perl modules such as CGI.pm do things by redeclaring packages - eek!
     # this is a nasty hack to get around that nasty hack. ie class is not added
@@ -594,6 +625,7 @@ sub export_graphviz
 		my $node = '{'.$Component->Name.'}';
 		#	warn "node : $node\n";
 		$nodes{$Component->Id} = $node;
+
 		$g->add_node($node, shape=>'record');
 	    }
 	}
@@ -1044,6 +1076,9 @@ sub _package_remove
     my $self = shift;
     my $package = shift;
 
+    #If the package id is undefined it does not make sense to continue
+    return if !$package->LocalId;
+
     my @packages = @{$self->{$package->Type}};
     $packages[$package->LocalId] = "removed";
 
@@ -1115,6 +1150,7 @@ sub _layout_dia_new {
   my @row_widths = ();
   # - add classes nodes
   my $classes = $self->Classes;
+
   if (ref $classes) {
     foreach my $Class (@$classes) {
       # count methods and attributes to give height
@@ -1137,6 +1173,7 @@ sub _layout_dia_new {
   }
   # - add superclasses nodes
   my $superclasses = $self->Superclasses;
+
   if (ref $superclasses) {
     foreach my $Superclass (@$superclasses) {
       my $width = 3 + ( (length ($Superclass->Name) - 3) * 0.75 );
@@ -1147,6 +1184,7 @@ sub _layout_dia_new {
   }
   # - add package nodes
   my $components = $self->Components;
+
   if (ref $components) {
     foreach my $Component (@$components) {
 #      warn "creating node for class : ", $Component->Id, "\n";

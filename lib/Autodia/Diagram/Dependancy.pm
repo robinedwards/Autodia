@@ -137,10 +137,10 @@ sub _initialise # over-rides method in DiagramObject
   my $parent = shift;
 
   $self->{"_child"} = $child;
-  $self->{"child"} = $child->Id;
+  $self->{"child"} = $child->Id  || '';
   $self->{"type"} = "dependancy";
   $self->{"_parent"} = $parent;
-  $self->{"parent"} = $parent->Id;
+  $self->{"parent"} = $parent->Id || '';
   $self->{"name"} = $self->{"parent"}."-".$self->{"child"};
 
   return 1;
