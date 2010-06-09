@@ -72,10 +72,17 @@ sub _parse_file { # parses dbi-connection string
   $unescape_tablenames = 1 if (lc($database_type) =~ m/(mysql)/);
 
   # pre-process tables
+  my $table_list;
+  if ($ENV{TABLES}) {
+      $table_list->{$_} = 1 for split /,/, $ENV{TABLES};
+      print "only processing the following tables: $ENV{TABLES}an";
+  }
 
-  foreach my $table ($dbh->tables(undef, $schema, '%', '')) {
+  for my $table ($dbh->tables(undef, $schema, '%', '')) {
       $table =~ s/['`"]//g;
       $table =~ s/.*\.(.*)$/$1/;
+      next if($ENV{TABLES} and !$table_list->{$table});
+
       my $esc_table = $table;
       $esc_table = qq{"$esc_table"} if ($escape_tablenames);
       my $sth = $dbh->prepare("select * from $esc_table where 1 = 0");
@@ -94,7 +101,7 @@ sub _parse_file { # parses dbi-connection string
 
     # get fields
     my $esc_table = $table;
-    $esc_table = qq{"${dbname}.$esc_table"} if ($escape_tablenames);
+    $esc_table = qq|"${dbname}.$esc_table"| if ($escape_tablenames);
 
     warn "using dbname $dbname / table $esc_table\n";
 
@@ -245,10 +252,9 @@ $handler->Parse($connection); # where connection includes full or dbi connection
 
 $handler->output(); # any arguments are ignored.
 
+=head1 USAGE
+
+$ TABLES=orders,faxes,users autodia.pl -l DBI -i "Pg:dbname=yourdb;host=localhost" -U www
+
 =cut
-
-
-
-
-
 
